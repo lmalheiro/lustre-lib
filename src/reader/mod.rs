@@ -1,8 +1,10 @@
-mod environment;
+
 mod tokenizer;
 
-use crate::reader::environment::*;
+use crate::environment::*;
 use crate::reader::tokenizer::*;
+use crate::object::Object;
+
 use anyhow::Result;
 use std::rc::Rc;
 
