@@ -42,10 +42,6 @@ where
                 }
                 Token::Text(s) => r#return!(IString; s),
                 Token::Symbol(s) => {
-                    let sym =  self.environment.find_symbol(&s);
-                    if sym.is_some () {
-                        r#return!(*sym.unwrap());
-                    }
                     self.environment
                         .intern(s.clone(), Object::Symbol(s.clone()));
                     r#return!(Object::Symbol(s));
