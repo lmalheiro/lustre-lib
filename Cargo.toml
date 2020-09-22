@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 rustf8 = { path = "../rustf8" }
+anyhow = "1.0.32"

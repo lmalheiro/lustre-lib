@@ -1,21 +1,26 @@
 //#![allow(unused)]
+use anyhow::Result;
 use rustf8::{Utf8Iterator, Utf8IteratorError::*};
 use std::fmt::Debug;
-use std::io::Error;
 
 pub enum Token {
     NoToken,
     Identifier(String),
     Integer(String),
+    Symbol(String),
+    Text(String),
+    Quote,
+    Quasiquote,
+    Unquote,
     OpenList,
     CloseList,
-    Symbol(String),
     Invalid(String),
 }
 enum State {
     Begin,
     DecodingIdentifier,
     DecodingInteger,
+    DecodingText,
     FinishedToken,
     Invalid,
 }
@@ -27,6 +32,10 @@ impl PartialEq for Token {
             (NoToken, NoToken) => true,
             (OpenList, OpenList) => true,
             (CloseList, CloseList) => true,
+            (Quote, Quote) => true,
+            (Quasiquote, Quasiquote) => true,
+            (Unquote, Unquote) => true,
+            (Text(a), Text(b)) => a == b,
             (Identifier(a), Identifier(b)) => a == b,
             (Integer(a), Integer(b)) => a == b,
             (Symbol(a), Symbol(b)) => a == b,
@@ -42,6 +51,10 @@ impl Clone for Token {
             NoToken => NoToken,
             OpenList => OpenList,
             CloseList => CloseList,
+            Quote => Quote,
+            Quasiquote => Quasiquote,
+            Unquote => Unquote,
+            Text(a) => Text(a.to_string()),
             Identifier(a) => Identifier(a.to_string()),
             Integer(a) => Integer(a.to_string()),
             Symbol(a) => Symbol(a.to_string()),
@@ -56,6 +69,10 @@ impl Debug for Token {
             NoToken => f.debug_struct("None").finish(),
             OpenList => f.debug_struct("OpenList").finish(),
             CloseList => f.debug_struct("CloseList").finish(),
+            Quote => f.debug_struct("Quote").finish(),
+            Quasiquote => f.debug_struct("Quasiquote").finish(),
+            Unquote => f.debug_struct("Unquote").finish(),
+            Text(a) => f.debug_struct("Text").field("string", a).finish(),
             Identifier(a) => f.debug_struct("Identifier").field("string", a).finish(),
             Integer(a) => f.debug_struct("Integer").field("string", a).finish(),
             Symbol(a) => f.debug_struct("Symbol").field("string", a).finish(),
@@ -64,23 +81,31 @@ impl Debug for Token {
     }
 }
 
-struct Tokenizer<T>
+pub struct Tokenizer<T>
 where
     T: Iterator,
 {
     chiter: Utf8Iterator<T>,
     state: (State, Token),
+    cache: Option<Token>
 }
 
 impl<T> Tokenizer<T>
 where
-    T: Iterator<Item = Result<u8, Error>>,
+    T: Iterator<Item = Result<u8, std::io::Error>>,
 {
     pub fn new(iter: T) -> Self {
         Tokenizer {
             chiter: Utf8Iterator::<T>::new(iter),
             state: (State::Begin, Token::NoToken),
+            cache: None
         }
+    }
+    pub fn putback(&mut self, tk: Token) {
+        if self.cache.is_some() {
+            panic!("Can't call 'putback()' twice before calling 'token()'.")
+        }
+        self.cache = Some(tk);
     }
     fn state_machine(&mut self, ch: char) {
         self.state = match &self.state {
@@ -89,6 +114,14 @@ where
                     (State::FinishedToken, Token::OpenList)
                 } else if ch == ')' {
                     (State::FinishedToken, Token::CloseList)
+                } else if ch == ',' {
+                    (State::FinishedToken, Token::Unquote)
+                } else if ch == '`' {
+                    (State::FinishedToken, Token::Quasiquote)
+                } else if ch == '\'' {
+                    (State::FinishedToken, Token::Quote)
+                } else if ch == '"' {
+                    (State::DecodingText, Token::Text(String::new()))
                 } else if ch.is_whitespace() {
                     (State::Begin, Token::NoToken)
                 } else if ch.is_alphabetic() || ch == '_' {
@@ -130,41 +163,36 @@ where
                     )
                 }
             }
-            (_, _) => panic!("Inconsistent state!"),
+            (State::DecodingText, Token::Text(txt)) => {
+                if ch == '"' {
+                    (State::FinishedToken, Token::Text(txt.to_string()))
+                } else {
+                    (
+                        State::DecodingText,
+                        Token::Text(txt.to_string() + &ch.to_string()),
+                    )
+                }
+            }
+            (State::DecodingIdentifier, _)
+            | (State::DecodingInteger, _)
+            | (State::DecodingText, _) => panic!("Inconsistent state!"),
         }
     }
 
-    pub fn next(&mut self) -> Option<Token> {
+    pub fn token(&mut self) -> Result<Option<Token>> {
+        
+        if let Some(tk) = self.cache.take() {
+            return Ok(Some(tk));
+        }
+
         loop {
-            let r = self.chiter.next();
-            match r {
-                Some(item) => match item {
-                    Ok(ch) => {
-                        self.state_machine(ch);
-                        if let State::FinishedToken = self.state.0 {
-                            return Some(self.state.1.clone());
-                        }
-                    }
-                    Err(e) => match e {
-                        InvalidSequenceError(bytes) => {
-                            panic!("Detected an invalid UTF-8 sequence! {:?}", bytes)
-                        }
-                        LongSequenceError(bytes) => {
-                            panic!("UTF-8 sequence with more tha 4 bytes! {:?}", bytes)
-                        }
-                        InvalidCharError(bytes) => panic!(
-                            "UTF-8 sequence resulted in an invalid character! {:?}",
-                            bytes
-                        ),
-                        IoError(ioe, bytes) => panic!(
-                            "I/O error {:?} while decoding de sequence {:?} !",
-                            ioe, bytes
-                        ),
-                    },
-                },
-                None => {
-                    return None
+            if let Some(ch) = self.chiter.next() {
+                self.state_machine(ch?);
+                if let State::FinishedToken = self.state.0 {
+                    return Ok(Some(self.state.1.clone()));
                 }
+            } else {
+                return Ok(None);
             }
         }
     }
@@ -178,7 +206,6 @@ mod tests {
 
     #[test]
     fn get_tokens() {
-
         macro_rules! s {
             ($value:expr) => {
                 String::from($value)
@@ -186,12 +213,12 @@ mod tests {
         }
 
         use Token::*;
-        let input = "(defun κόσμε (x y) (+ x y))";
+        let input = "(defun κόσμε (x y) '(+ x y \"test strings!\"))";
         let mut tokens = Tokenizer::new(Cursor::new(input).bytes());
 
         let mut tokenized = Vec::<Token>::new();
 
-        while let Some(token) = tokens.next() {
+        while let Some(token) = tokens.token().unwrap() {
             eprintln!("{:?}", token);
             tokenized.push(token);
         }
@@ -204,12 +231,14 @@ mod tests {
             Identifier(s!("x")),
             Identifier(s!("y")),
             CloseList,
+            Quote,
             OpenList,
             Symbol(s!("+")),
             Identifier(s!("x")),
             Identifier(s!("y")),
+            Text(s!("test strings!")),
             CloseList,
-            CloseList
+            CloseList,
         ];
 
         assert_eq!(cmp, tokenized);
