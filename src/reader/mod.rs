@@ -4,6 +4,7 @@ mod tokenizer;
 use crate::reader::environment::*;
 use crate::reader::tokenizer::*;
 use anyhow::Result;
+use std::rc::Rc;
 
 pub struct Reader<T>
 where
@@ -15,10 +16,10 @@ where
 
 macro_rules! r#return {
     ($obj:ident; $value:expr) => {
-        return Ok(Some(Object::$obj($value)));
+        return Ok(Rc::new(Some(Object::$obj($value))));
     };
     ($value:expr) => {
-        return Ok(Some($value));
+        return Ok($value);
     };
 }
 
@@ -32,7 +33,7 @@ where
             environment,
         }
     }
-    pub fn read(&mut self) -> Result<Option<Object>> {
+    pub fn read(&mut self) -> Result<Rc<Option<Object>>> {
         if let Some(token) = self.tokenizer.token()? {
             match token {
                 Token::Identifier(s) => r#return!(IString; s),
@@ -42,9 +43,14 @@ where
                 }
                 Token::Text(s) => r#return!(IString; s),
                 Token::Symbol(s) => {
-                    self.environment
-                        .intern(s.clone(), Object::Symbol(s.clone()));
-                    r#return!(Object::Symbol(s));
+                    if let Some(value) = self.environment.find_symbol(&s) {
+                        return Ok(value);
+                    } else {
+                        let value = self
+                            .environment
+                            .intern(s.clone(), Object::Symbol(s.clone()));
+                        return Ok(value);
+                    }
                 }
                 Token::OpenList => self.read_list(),
                 Token::Quote => self.read(),
@@ -56,19 +62,19 @@ where
                 Token::Invalid(s) => unimplemented!("{:?}", s),
             }
         } else {
-            Ok(None)
+            Ok(Rc::new(None))
         }
     }
-    fn read_list(&mut self) -> Result<Option<Object>> {
+    fn read_list(&mut self) -> Result<Rc<Option<Object>>> {
         if let Some(token) = self.tokenizer.token()? {
             if let Token::CloseList = token {
-                Ok(None)
+                Ok(Rc::new(None))
             } else {
                 self.tokenizer.putback(token);
-                Ok(Some(Object::Cons(
-                    Box::new(self.read()?),
-                    Box::new(self.read_list()?),
-                )))
+                Ok(Rc::new(Some(Object::Cons(
+                    self.read()?,
+                    self.read_list()?,
+                ))))
             }
         } else {
             panic!("Unexpected end of stream!");
@@ -84,14 +90,20 @@ mod tests {
 
     #[test]
     fn reader_test() {
-        let input = "(defun κόσμε (x y) (+ x y))";
+        let input = "(defun κόσμε (x y) (* (+ x y) 10))";
         let tokenizer = Tokenizer::new(Cursor::new(input).bytes());
         let environment = Environment::new();
         let mut reader = Reader::new(tokenizer, environment);
-        let object = reader.read().unwrap().unwrap();
+        let a = reader.read();
+        let b = a.unwrap();
+        if let Some(object) = b.as_ref() {
+            eprintln!("result: {}", object);
 
-        eprintln!("result: {}", object);
+            assert_eq!("( defun κόσμε ( x y ) ( * ( + x y ) 10 ) )", format!("{}", object));
+        } else {
+            panic!("Ooops! Not an object...")
+        }
 
-        assert_eq!("( defun κόσμε ( x y ) ( + x y ) )", format!("{}", object));
+        
     }
 }

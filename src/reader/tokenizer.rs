@@ -152,14 +152,14 @@ where
                     (State::FinishedToken, Token::Integer(num.to_string()))
                 } else if ch.is_digit(10) {
                     (
-                        State::DecodingIdentifier,
+                        State::DecodingInteger,
                         Token::Integer(num.to_string() + &ch.to_string()),
                     )
                 } else {
                     self.chiter.unget(ch);
                     (
                         State::FinishedToken,
-                        Token::Integer(num.to_string() + &ch.to_string()),
+                        Token::Integer(num.to_string()),
                     )
                 }
             }
@@ -180,7 +180,7 @@ where
     }
 
     pub fn token(&mut self) -> Result<Option<Token>> {
-        
+
         if let Some(tk) = self.cache.take() {
             return Ok(Some(tk));
         }
