@@ -130,6 +130,8 @@ where
                     (State::DecodingInteger, Token::Integer(ch.to_string()))
                 } else if ch.is_ascii_punctuation() {
                     (State::FinishedToken, Token::Symbol(ch.to_string()))
+                } else if ch == '\u{004}' {
+                    (State::FinishedToken, Token::NoToken)
                 } else {
                     (State::Invalid, Token::Invalid(ch.to_string()))
                 }
@@ -192,7 +194,10 @@ where
                     return Ok(Some(self.state.1.clone()));
                 }
             } else {
-                return Ok(None);
+                self.state_machine('\u{004}');
+                if let State::FinishedToken = self.state.0 {
+                    return Ok(Some(self.state.1.clone()));
+                }
             }
         }
     }

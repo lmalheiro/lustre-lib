@@ -1,19 +1,32 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use crate::object;
 use crate::object::Object;
 
 pub struct Environment {
     layers: Vec<HashMap<String, Rc<Option<Object>>>>,
+    nil: Rc<Option<Object>>,
 }
 
 impl Environment {
     pub fn new() -> Self {
-        Environment {
+        let mut value = Self {
             layers: vec![HashMap::new()],
-        }
+            nil: Rc::new(None),
+        };
+        use crate::object::Environment;
+        value.intern("nil".to_string(), Rc::clone(&value.nil));
+        value
     }
-    pub fn find_symbol(&self, symbol: &String) -> Option<Rc<Option<Object>>> {
+}
+
+impl object::Environment for Environment {
+    fn get_nil(&self) -> Rc<Option<Object>> {
+        Rc::clone(&self.nil)
+    }
+
+    fn find_symbol(&self, symbol: &String) -> Option<Rc<Option<Object>>> {
         let mut i = self.layers.iter().rev();
 
         loop {
@@ -26,19 +39,22 @@ impl Environment {
             };
         }
     }
-    pub fn new_layer(&mut self) {
-        self.layers.push(HashMap::<String, Rc<Option<Object>>>::new());
+    fn new_layer(&mut self) {
+        self.layers
+            .push(HashMap::<String, Rc<Option<Object>>>::new());
     }
-    pub fn drop_layer(&mut self) {
+    fn drop_layer(&mut self) {
         assert!(self.layers.len() > 1); // Should not drop the last one
         self.layers.pop();
     }
-    pub fn intern(&mut self, symbol: String, value: Object) -> Rc<Option<Object>> {
-        let value = Rc::new(Some(value));
-        self.layers.last_mut().unwrap().insert(symbol, Rc::clone(&value));
+    fn intern(&mut self, symbol: String, value: Rc<Option<Object>>) -> Rc<Option<Object>> {
+        self.layers
+            .last_mut()
+            .unwrap()
+            .insert(symbol, Rc::clone(&value));
         value
     }
-    pub fn unintern(&mut self, symbol: &String) {
+    fn unintern(&mut self, symbol: &String) {
         self.layers.last_mut().unwrap().remove(symbol);
     }
 }
