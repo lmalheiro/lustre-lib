@@ -27,6 +27,8 @@ impl object::Environment for Environment {
     }
 
     fn find_symbol(&self, symbol: &String) -> Option<Rc<Option<Object>>> {
+        eprintln!("FIND: {:?}", self.layers.last());
+
         let mut i = self.layers.iter().rev();
 
         loop {
@@ -52,6 +54,7 @@ impl object::Environment for Environment {
             .last_mut()
             .unwrap()
             .insert(symbol, Rc::clone(&value));
+        eprintln!("INTERN: {:?}", self.layers.last());
         value
     }
     fn unintern(&mut self, symbol: &String) {
