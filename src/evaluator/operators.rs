@@ -1,16 +1,12 @@
-use crate::object::Environment;
-use crate::object::Object;
+
+use crate::object::*;
 use std::rc::Rc;
 
-macro_rules! not_nil {
-    ($env:expr; $value:expr) => {
-        !Rc::ptr_eq($value, &$env.get_nil())
-    };
-}
-pub fn sum(obj: Rc<Option<Object>>, env: &dyn Environment) -> Rc<Option<Object>> {
+
+pub fn sum(obj: RefObject, env: &dyn Environment) -> RefObject {
     let mut total = 0i32;
     let mut next = &obj;
-    while not_nil!(env; next) {
+    while not_nil(next) {
         if let Some(Object::Cons(car, cdr)) = next.as_ref() {
             if let Some(Object::Integer(value)) = car.as_ref() {
                 total += value;
@@ -25,10 +21,10 @@ pub fn sum(obj: Rc<Option<Object>>, env: &dyn Environment) -> Rc<Option<Object>>
     Rc::new(Some(Object::Integer(total)))
 }
 
-pub fn sub(obj: Rc<Option<Object>>, env: &dyn Environment) -> Rc<Option<Object>> {
+pub fn sub(obj: RefObject, env: &dyn Environment) -> RefObject {
     let mut total = 0i32;
     let mut next = &obj;
-    if not_nil!(env; next) {
+    if not_nil(next) {
         if let Some(Object::Cons(car, cdr)) = next.as_ref() {
             if let Some(Object::Integer(value)) = car.as_ref() {
                 total = *value;
@@ -36,7 +32,7 @@ pub fn sub(obj: Rc<Option<Object>>, env: &dyn Environment) -> Rc<Option<Object>>
                 panic!("Should be an integer here...")
             }
             next = cdr;
-            while not_nil!(env; next) {
+            while not_nil(next) {
                 if let Some(Object::Cons(car, cdr)) = next.as_ref() {
                     if let Some(Object::Integer(value)) = car.as_ref() {
                         total -= *value;
@@ -55,7 +51,7 @@ pub fn sub(obj: Rc<Option<Object>>, env: &dyn Environment) -> Rc<Option<Object>>
     Rc::new(Some(Object::Integer(total)))
 }
 
-pub fn greater_than(obj: Rc<Option<Object>>, env: &dyn Environment) -> Rc<Option<Object>> {
+pub fn greater_than(obj: RefObject, env: &dyn Environment) -> RefObject {
     let (car1, cdr) = destructure_list(obj);
     let (car2, _) = destructure_list(cdr);
     if integer_value(car1) > integer_value(car2) {
@@ -65,7 +61,7 @@ pub fn greater_than(obj: Rc<Option<Object>>, env: &dyn Environment) -> Rc<Option
     }
 }
 
-pub fn less_than(obj: Rc<Option<Object>>, env: &dyn Environment) -> Rc<Option<Object>> {
+pub fn less_than(obj: RefObject, env: &dyn Environment) -> RefObject {
     let (car1, cdr) = destructure_list(obj);
     let (car2, _) = destructure_list(cdr);
     if integer_value(car1) < integer_value(car2) {
@@ -75,7 +71,7 @@ pub fn less_than(obj: Rc<Option<Object>>, env: &dyn Environment) -> Rc<Option<Ob
     }
 }
 
-pub fn equal_to(obj: Rc<Option<Object>>, env: &dyn Environment) -> Rc<Option<Object>> {
+pub fn equal_to(obj: RefObject, env: &dyn Environment) -> RefObject {
     let (car1, cdr) = destructure_list(obj);
     let (car2, _) = destructure_list(cdr);
     if integer_value(car1) == integer_value(car2) {
@@ -85,16 +81,16 @@ pub fn equal_to(obj: Rc<Option<Object>>, env: &dyn Environment) -> Rc<Option<Obj
     }
 }
 
-pub fn quote(obj: Rc<Option<Object>>, _env: &dyn Environment) -> Rc<Option<Object>> {
+pub fn quote(obj: RefObject, _env: &dyn Environment) -> RefObject {
     let (car, _) = destructure_list(obj);
     car
 }
 
 pub fn apply(
-    function: Rc<Option<Object>>,
-    obj: Rc<Option<Object>>,
+    function: RefObject,
+    obj: RefObject,
     env: &dyn Environment,
-) -> Rc<Option<Object>> {
+) -> RefObject {
     match function
         .as_ref()
         .as_ref()
@@ -106,29 +102,6 @@ pub fn apply(
     }
 }
 
-pub fn destructure_list(list: Rc<Option<Object>>) -> (Rc<Option<Object>>, Rc<Option<Object>>) {
-    if let Some(Object::Cons(car, cdr)) = list.as_ref() {
-        (car.clone(), cdr.clone())
-    } else {
-        panic!("Not a list!");
-    }
-}
-
-pub fn symbol_value(sym: Rc<Option<Object>>) -> String {
-    if let Some(Object::Symbol(value)) = sym.as_ref() {
-        value.to_string()
-    } else {
-        panic!("Not a symbol!");
-    }
-}
-
-pub fn integer_value(int: Rc<Option<Object>>) -> i32 {
-    if let Some(Object::Integer(value)) = int.as_ref() {
-        *value
-    } else {
-        panic!("Not an integer!");
-    }   
-}
 
 pub fn initialize_operators(environment: &mut dyn Environment) {
     environment.intern(String::from("QUOTE"), Rc::new(Some(Object::Operator(quote))));

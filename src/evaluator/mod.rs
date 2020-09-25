@@ -8,34 +8,28 @@ struct Evaluator<'a> {
     environment: &'a mut dyn Environment,
 }
 
-macro_rules! not_nil {
-    ($env:expr; $value:expr) => {
-        !Rc::ptr_eq($value, &$env.get_nil())
-    };
-}
-
 impl<'a> Evaluator<'a> {
     pub fn new(environment: &'a mut dyn Environment) -> Self {
         Evaluator { environment }
     }
 
-    pub fn eval(&self, obj: Rc<Option<Object>>) -> Rc<Option<Object>> {
+    pub fn eval(&self, obj: RefObject) -> RefObject {
         match obj.as_ref() {
             None => self.environment.get_nil(),
             Some(Object::Cons(car, cdr)) => {
                 if let Some(Object::Symbol(s)) = car.as_ref() {
                     if s == "if" {
-                        let (car1, cdr) = operators::destructure_list(cdr.clone());
-                        let (car2, cdr) = operators::destructure_list(cdr);
-                        let (car3, _) = operators::destructure_list(cdr);
+                        let (car1, cdr) = destructure_list(cdr.clone());
+                        let (car2, cdr) = destructure_list(cdr);
+                        let (car3, _) = destructure_list(cdr);
                         let test = self.eval(car1);
-                        if not_nil!(self.environment; &test) {
+                        if not_nil(&test) {
                             self.eval(car2)
                         } else {
                             self.eval(car3)
                         }
                     } else if s == "QUOTE" {
-                        let (car, _) = operators::destructure_list(cdr.clone());
+                        let (car, _) = destructure_list(cdr.clone());
                         car
                     } else {
                         operators::apply(
@@ -73,8 +67,8 @@ impl<'a> Evaluator<'a> {
         // }
     }
 
-    fn eval_list(&self, obj: Rc<Option<Object>>) -> Rc<Option<Object>> {
-        if not_nil!(self.environment; &obj) {
+    fn eval_list(&self, obj: RefObject) -> RefObject {
+        if not_nil(&obj) {
             if let Some(Object::Cons(car, cdr)) = obj.as_ref() {
                 Rc::new(Some(Object::Cons(
                     self.eval(car.clone()),

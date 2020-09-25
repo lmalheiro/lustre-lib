@@ -1,9 +1,8 @@
 
 pub mod tokenizer;
 
-use crate::object::Environment;
 use crate::reader::tokenizer::*;
-use crate::object::Object;
+use crate::object::{Object, RefObject, Environment};
 
 use anyhow::Result;
 use std::rc::Rc;
@@ -35,7 +34,7 @@ where
             environment,
         }
     }
-    pub fn read(&mut self) -> Result<Rc<Option<Object>>> {
+    pub fn read(&mut self) -> Result<RefObject> {
         if let Some(token) = self.tokenizer.token()? {
             match token {
                 Token::Integer(s) => {
@@ -71,7 +70,7 @@ where
             Ok(Rc::new(None))
         }
     }
-    fn read_list(&mut self) -> Result<Rc<Option<Object>>> {
+    fn read_list(&mut self) -> Result<RefObject> {
         if let Some(token) = self.tokenizer.token()? {
             if let Token::CloseList = token {
                 Ok(self.environment.get_nil())

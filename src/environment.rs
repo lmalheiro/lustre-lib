@@ -2,11 +2,11 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::object;
-use crate::object::Object;
+use crate::object::RefObject;
 
 pub struct Environment {
-    layers: Vec<HashMap<String, Rc<Option<Object>>>>,
-    nil: Rc<Option<Object>>,
+    layers: Vec<HashMap<String, RefObject>>,
+    nil: RefObject,
 }
 
 impl Environment {
@@ -22,11 +22,11 @@ impl Environment {
 }
 
 impl object::Environment for Environment {
-    fn get_nil(&self) -> Rc<Option<Object>> {
+    fn get_nil(&self) -> RefObject {
         Rc::clone(&self.nil)
     }
 
-    fn find_symbol(&self, symbol: &String) -> Option<Rc<Option<Object>>> {
+    fn find_symbol(&self, symbol: &String) -> Option<RefObject> {
         eprintln!("FIND: {:?}", self.layers.last());
 
         let mut i = self.layers.iter().rev();
@@ -43,13 +43,13 @@ impl object::Environment for Environment {
     }
     fn new_layer(&mut self) {
         self.layers
-            .push(HashMap::<String, Rc<Option<Object>>>::new());
+            .push(HashMap::<String, RefObject>::new());
     }
     fn drop_layer(&mut self) {
         assert!(self.layers.len() > 1); // Should not drop the last one
         self.layers.pop();
     }
-    fn intern(&mut self, symbol: String, value: Rc<Option<Object>>) -> Rc<Option<Object>> {
+    fn intern(&mut self, symbol: String, value: RefObject) -> RefObject {
         self.layers
             .last_mut()
             .unwrap()
