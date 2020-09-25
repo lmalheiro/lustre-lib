@@ -57,7 +57,7 @@ where
                 Token::Quote => {
                     Ok(Rc::new(Some(Object::Cons(
                         Rc::new(Some(Object::Symbol(String::from("QUOTE")))),
-                        self.read_list()?,
+                        Rc::new(Some(Object::Cons(self.read()?, self.environment.get_nil()))),
                     ))))
                 }
 

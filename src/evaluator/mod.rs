@@ -34,6 +34,9 @@ impl<'a> Evaluator<'a> {
                         } else {
                             self.eval(car3)
                         }
+                    } else if s == "QUOTE" {
+                        let (car, _) = operators::destructure_list(cdr.clone());
+                        car
                     } else {
                         operators::apply(
                             self.eval(car.clone()),
@@ -71,8 +74,6 @@ impl<'a> Evaluator<'a> {
     }
 
     fn eval_list(&self, obj: Rc<Option<Object>>) -> Rc<Option<Object>> {
-        
-
         if not_nil!(self.environment; &obj) {
             if let Some(Object::Cons(car, cdr)) = obj.as_ref() {
                 Rc::new(Some(Object::Cons(
@@ -121,7 +122,8 @@ mod tests {
     #[test]
     fn eval_test_2() {
         //let input = "(+ 1000 1000 (+ 10 10) (- 0 100 ))";
-        let input = "(if (< 20 20) (if (> 30 20) \"TRUE-TRUE\" \"TRUE-FALSE\") \"FALSE\")";
+        //let input = "(if (< 20 20) (if (> 30 20) \"TRUE-TRUE\" \"TRUE-FALSE\") \"FALSE\")";
+        let input = "'(a b c)";
         let tokenizer = reader::tokenizer::Tokenizer::new(Cursor::new(input).bytes());
         let mut environment = environment::Environment::new();
         operators::initialize_operators(&mut environment);

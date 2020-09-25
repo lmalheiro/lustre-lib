@@ -85,6 +85,11 @@ pub fn equal_to(obj: Rc<Option<Object>>, env: &dyn Environment) -> Rc<Option<Obj
     }
 }
 
+pub fn quote(obj: Rc<Option<Object>>, _env: &dyn Environment) -> Rc<Option<Object>> {
+    let (car, _) = destructure_list(obj);
+    car
+}
+
 pub fn apply(
     function: Rc<Option<Object>>,
     obj: Rc<Option<Object>>,
@@ -126,6 +131,7 @@ pub fn integer_value(int: Rc<Option<Object>>) -> i32 {
 }
 
 pub fn initialize_operators(environment: &mut dyn Environment) {
+    environment.intern(String::from("QUOTE"), Rc::new(Some(Object::Operator(quote))));
     environment.intern(String::from("+"), Rc::new(Some(Object::Operator(sum))));
     environment.intern(String::from("-"), Rc::new(Some(Object::Operator(sub))));
     environment.intern(String::from("="), Rc::new(Some(Object::Operator(equal_to))));
