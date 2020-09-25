@@ -32,7 +32,7 @@ pub enum Object {
     IString(String),
     Cons(RefObject, RefObject),
     Lambda(RefObject, RefObject),
-    Operator(Op),
+    Operator(String, Op),
     Symbol(String),
 }
 
@@ -44,7 +44,7 @@ impl PartialEq for Object {
             (IString(v1), IString(v2)) => v1 == v2,
             (Cons(v11, v12), Cons(v21, v22)) => v11.as_ref() == v21.as_ref() && v12 == v22,
             (Lambda(v11, v12), Lambda(v21, v22)) => v11.as_ref() == v21.as_ref() && v12 == v22,
-            (Operator(_v1), Operator(_v2)) => unimplemented!(),
+            (Operator(n1, _), Operator(n2, _)) => n1 == n2,
             (Symbol(v1), Symbol(v2)) => v1 == v2,
             (_, _) => false,
         }
@@ -98,7 +98,7 @@ impl Object {
                     .or(Some(&Object::IString(String::from(""))))
                     .unwrap()
             ),
-            Object::Operator(_) => write!(f, "OPERATOR"),
+            Object::Operator(n, _) => write!(f, "{}", n),
         }
     }
 }

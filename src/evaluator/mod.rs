@@ -32,13 +32,12 @@ impl<'a> Evaluator<'a> {
                         let (car, _) = destructure_list(cdr)?;
                         Ok(Arc::clone(car))
                     } else if s == "LAMBDA" {
-                        let (_, cdr) = destructure_list(cdr)?;
-                        self.mk_lambda(cdr.clone(), self.environment)
+                        self.mk_lambda(cdr)
                     } else {
-                        self.apply(self.eval(car)?, self.eval_list(cdr)?, self.environment)
+                        self.apply(self.eval(car)?, self.eval_list(cdr)?)
                     }
                 } else {
-                    self.apply(self.eval(car)?, self.eval_list(cdr)?, self.environment)
+                    self.apply(self.eval(car)?, self.eval_list(cdr)?)
                 }
             }
             _ => Ok(Arc::clone(obj)),
@@ -54,20 +53,24 @@ impl<'a> Evaluator<'a> {
         }
     }
 
-    fn mk_lambda(&self, obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
-        let (car1, cdr) = destructure_list(&obj)?;
-        let (car2, _) = destructure_list(cdr)?;
-        unimplemented!()
+    fn mk_lambda(&self, obj: &RefObject) -> ResultRefObject {
+        let (params, cdr) = destructure_list(obj)?;
+        let (expression, _) = destructure_list(cdr)?;
+        Object::Lambda(params.clone(), expression.clone()).into()
     }
 
-    fn apply(&self, function: RefObject, obj: RefObject, env: &dyn Environment) -> ResultRefObject {
+    fn apply(&self, function: RefObject, obj: RefObject) -> ResultRefObject {
         match function
             .as_ref()
             .as_ref()
             .expect("Expecting a value, instead got nil or other None value.")
         {
-            Object::Lambda(_parameters, _expression) => unimplemented!(),
-            Object::Operator(f) => f(obj, env),
+            Object::Lambda(_parameters, _expression) => {
+                self.environment.new_layer();
+
+                result_nil()
+            },
+            Object::Operator(_, f) => f(obj, self.environment),
             _ => panic!("Expected operator or function."),
         }
     }

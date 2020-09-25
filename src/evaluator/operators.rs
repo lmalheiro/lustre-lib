@@ -112,8 +112,6 @@ pub fn cdr(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
     }
 }
 
-
-
 pub fn greater_than(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
     let (car1, cdr) = destructure_list(&obj)?;
     let (car2, _) = destructure_list(&cdr)?;
@@ -150,44 +148,25 @@ pub fn quote(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
 }
 
 pub fn initialize_operators(environment: &mut dyn Environment) {
-    environment.intern(
-        String::from("QUOTE"),
-        Arc::new(Some(Object::Operator(quote))),
-    );
-    environment.intern(
-        String::from("AND"),
-        Arc::new(Some(Object::Operator(and))),
-    );
-    environment.intern(
-        String::from("OR"),
-        Arc::new(Some(Object::Operator(or))),
-    );
-    environment.intern(
-        String::from("NOT"),
-        Arc::new(Some(Object::Operator(not))),
-    );
-    environment.intern(
-        String::from("CAR"),
-        Arc::new(Some(Object::Operator(car))),
-    );
-    environment.intern(
-        String::from("CDR"),
-        Arc::new(Some(Object::Operator(cdr))),
-    );
-    environment.intern(String::from("+"), Arc::new(Some(Object::Operator(sum))));
-    environment.intern(String::from("-"), Arc::new(Some(Object::Operator(sub))));
-    environment.intern(String::from("*"), Arc::new(Some(Object::Operator(mult))));
-    environment.intern(String::from("/"), Arc::new(Some(Object::Operator(div))));
-    environment.intern(
-        String::from("="),
-        Arc::new(Some(Object::Operator(equal_to))),
-    );
-    environment.intern(
-        String::from("<"),
-        Arc::new(Some(Object::Operator(less_than))),
-    );
-    environment.intern(
-        String::from(">"),
-        Arc::new(Some(Object::Operator(greater_than))),
-    );
+    macro_rules! register {
+        ($name:literal, $func:ident) => {
+            environment.intern(
+                String::from($name),
+                Arc::new(Some(Object::Operator(String::from($name), $func))),
+            );
+        };
+    }
+    register!("QUOTE", quote);
+    register!("AND", and);
+    register!("OR", or);
+    register!("NOT", not);
+    register!("CAR", car);
+    register!("CDR", cdr);
+    register!("+", sum);
+    register!("-", sub);
+    register!("*", mult);
+    register!("/", div);
+    register!("=", equal_to);
+    register!("<", less_than);
+    register!(">", greater_than);
 }
