@@ -1,3 +1,4 @@
+mod errors;
 mod object;
 mod environment;
 mod reader;

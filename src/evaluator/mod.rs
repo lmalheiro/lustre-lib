@@ -1,6 +1,6 @@
 mod operators;
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::object::*;
 
@@ -13,72 +13,55 @@ impl<'a> Evaluator<'a> {
         Evaluator { environment }
     }
 
-    pub fn eval(&self, obj: RefObject) -> RefObject {
+    pub fn eval(&self, obj: RefObject) -> ResultRefObject {
         match obj.as_ref() {
-            None => self.environment.get_nil(),
+            None => ResultNil(),
             Some(Object::Cons(car, cdr)) => {
                 if let Some(Object::Symbol(s)) = car.as_ref() {
                     if s == "if" {
-                        let (car1, cdr) = destructure_list(cdr.clone());
-                        let (car2, cdr) = destructure_list(cdr);
-                        let (car3, _) = destructure_list(cdr);
-                        let test = self.eval(car1);
+                        let (car1, cdr) = destructure_list(cdr.clone())?;
+                        let (car2, cdr) = destructure_list(cdr)?;
+                        let (car3, _) = destructure_list(cdr)?;
+                        let test = self.eval(car1)?;
                         if not_nil(&test) {
                             self.eval(car2)
                         } else {
                             self.eval(car3)
                         }
                     } else if s == "QUOTE" {
-                        let (car, _) = destructure_list(cdr.clone());
-                        car
+                        let (car, _) = destructure_list(cdr.clone())?;
+                        Ok(car)
                     } else {
                         operators::apply(
-                            self.eval(car.clone()),
-                            self.eval_list(cdr.clone()),
+                            self.eval(car.clone())?,
+                            self.eval_list(cdr.clone())?,
                             self.environment,
                         )
                     }
                 } else {
                     operators::apply(
-                        self.eval(car.clone()),
-                        self.eval_list(cdr.clone()),
+                        self.eval(car.clone())?,
+                        self.eval_list(cdr.clone())?,
                         self.environment,
                     )
                 }
             }
-            _ => obj,
+            _ => Ok(obj),
         }
-        // if Rc::ptr_eq(&obj, &self.environment.get_nil()) {
-        //     return self.environment.get_nil();
-        // } else {
-        //     if let Object::Cons(car, cdr) = obj
-        //         .as_ref()
-        //         .as_ref()
-        //         .expect("Invalid 'None' object. It should have matched the 'nil'.")
-        //     {
-        //         operators::apply(
-        //             self.eval(car.clone()),
-        //             self.eval_list(cdr.clone()),
-        //             self.environment,
-        //         )
-        //     } else {
-        //         obj
-        //     }
-        // }
     }
 
-    fn eval_list(&self, obj: RefObject) -> RefObject {
+    fn eval_list(&self, obj: RefObject) -> ResultRefObject {
         if not_nil(&obj) {
             if let Some(Object::Cons(car, cdr)) = obj.as_ref() {
-                Rc::new(Some(Object::Cons(
-                    self.eval(car.clone()),
-                    self.eval_list(cdr.clone()),
-                )))
+                Ok(Arc::new(Some(Object::Cons(
+                    self.eval(car.clone())?,
+                    self.eval_list(cdr.clone())?,
+                ))))
             } else {
                 panic!("Should exist a list here...")
             }
         } else {
-            self.environment.get_nil()
+            ResultNil()
         }
     }
 }
@@ -105,7 +88,7 @@ mod tests {
         if let Some(_) = value.as_ref() {
             let evaluator = Evaluator::new(&mut environment);
             let result = evaluator.eval(value);
-            if let Some(obj) = result.as_ref() {
+            if let Some(obj) = result.unwrap().as_ref() {
                 eprintln!("result: {}", obj);
             }
         } else {
@@ -129,7 +112,7 @@ mod tests {
             let evaluator = Evaluator::new(&mut environment);
             let result = evaluator.eval(value);
             eprintln!("result: {:?}", result);
-            if let Some(obj) = result.as_ref() {
+            if let Some(obj) = result.unwrap().as_ref() {
                 eprintln!("obj: {}", obj);
             }
         } else {

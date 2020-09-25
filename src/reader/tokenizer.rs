@@ -1,6 +1,6 @@
 //#![allow(unused)]
-use anyhow::Result;
-use rustf8::{Utf8Iterator, Utf8IteratorError::*};
+use crate::errors::Result;
+use rustf8::Utf8Iterator;
 use std::fmt::Debug;
 
 pub enum Token {
@@ -92,7 +92,7 @@ where
 
 impl<T> Tokenizer<T>
 where
-    T: Iterator<Item = Result<u8, std::io::Error>>,
+    T: Iterator<Item = std::result::Result<u8, std::io::Error>>,
 {
     pub fn new(iter: T) -> Self {
         Tokenizer {

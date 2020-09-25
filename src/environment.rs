@@ -1,31 +1,26 @@
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::object;
-use crate::object::RefObject;
+use crate::object::{RefObject, Nil};
 
 pub struct Environment {
     layers: Vec<HashMap<String, RefObject>>,
-    nil: RefObject,
 }
 
 impl Environment {
     pub fn new() -> Self {
         let mut value = Self {
-            layers: vec![HashMap::new()],
-            nil: Rc::new(None),
+            layers: vec![HashMap::new()]
         };
         use crate::object::Environment;
-        value.intern("nil".to_string(), Rc::clone(&value.nil));
+        value.intern("nil".to_string(), Nil());
         value
     }
 }
 
 impl object::Environment for Environment {
-    fn get_nil(&self) -> RefObject {
-        Rc::clone(&self.nil)
-    }
-
+    
     fn find_symbol(&self, symbol: &String) -> Option<RefObject> {
         eprintln!("FIND: {:?}", self.layers.last());
 
@@ -34,7 +29,7 @@ impl object::Environment for Environment {
         loop {
             if let Some(layer) = i.next() {
                 if let Some(value) = layer.get(symbol) {
-                    break Some(Rc::clone(value));
+                    break Some(Arc::clone(value));
                 }
             } else {
                 break None;
@@ -53,7 +48,7 @@ impl object::Environment for Environment {
         self.layers
             .last_mut()
             .unwrap()
-            .insert(symbol, Rc::clone(&value));
+            .insert(symbol, Arc::clone(&value));
         eprintln!("INTERN: {:?}", self.layers.last());
         value
     }

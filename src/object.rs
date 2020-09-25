@@ -1,12 +1,25 @@
 //use std::fmt::Debug;
 use std::fmt::Debug;
 use std::fmt::Display;
-use std::rc::Rc;
+use std::sync::Arc;
+use crate::errors;
 
-pub type RefObject = Rc<Option<Object>>;
+
+pub type RefObject = Arc<Option<Object>>;
+pub type ResultRefObject = errors::Result<RefObject>;
+pub type DestrucuturedCons = (RefObject, RefObject);
+pub type ResultDestrucuturedCons =  errors::Result<DestrucuturedCons>;
+
+pub fn Nil() -> RefObject {
+    Arc::new(None)
+}
+
+pub fn ResultNil() -> ResultRefObject {
+    Ok(Arc::new(None))
+}
 
 pub trait Environment {
-    fn get_nil(&self) -> RefObject;
+    //fn get_nil(&self) -> RefObject;
     fn find_symbol(&self, symbol: &String) -> Option<RefObject>;
     fn new_layer(&mut self);
     fn drop_layer(&mut self);
@@ -14,7 +27,7 @@ pub trait Environment {
     fn unintern(&mut self, symbol: &String);
 }
 
-type Op = fn(RefObject, &dyn Environment) -> RefObject;
+type Op = fn(RefObject, &dyn Environment) -> ResultRefObject;
 
 pub enum Object {
     Integer(i32),
@@ -97,26 +110,26 @@ pub fn not_nil(obj: &RefObject) -> bool {
     }
 }
 
-pub fn destructure_list(list: RefObject) -> (RefObject, RefObject) {
+pub fn destructure_list(list: RefObject) -> ResultDestrucuturedCons {
     if let Some(Object::Cons(car, cdr)) = list.as_ref() {
-        (car.clone(), cdr.clone())
+        Ok((car.clone(), cdr.clone()))
     } else {
-        panic!("Not a list!");
+        Err(errors::Error::NotCons)
     }
 }
 
-pub fn symbol_value(sym: RefObject) -> String {
+pub fn symbol_value(sym: RefObject) -> errors::Result<String> {
     if let Some(Object::Symbol(value)) = sym.as_ref() {
-        value.to_string()
+        Ok(value.to_string())
     } else {
-        panic!("Not a symbol!");
+        Err(errors::Error::NotSymbol)
     }
 }
 
-pub fn integer_value(int: RefObject) -> i32 {
+pub fn integer_value(int: RefObject) -> errors::Result<i32> {
     if let Some(Object::Integer(value)) = int.as_ref() {
-        *value
+        Ok(*value)
     } else {
-        panic!("Not an integer!");
+        Err(errors::Error::NotInteger)
     }   
 }

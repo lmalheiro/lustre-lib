@@ -2,10 +2,10 @@
 pub mod tokenizer;
 
 use crate::reader::tokenizer::*;
-use crate::object::{Object, RefObject, Environment};
+use crate::object::{Object, RefObject, Environment, Nil, ResultNil};
 
-use anyhow::Result;
-use std::rc::Rc;
+use crate::errors::Result;
+use std::sync::Arc;
 
 pub struct Reader<'a, T>
 where
@@ -17,7 +17,7 @@ where
 
 macro_rules! r#return {
     ($obj:ident; $value:expr) => {
-        return Ok(Rc::new(Some(Object::$obj($value))));
+        return Ok(Arc::new(Some(Object::$obj($value))));
     };
     ($value:expr) => {
         return Ok($value);
@@ -48,15 +48,15 @@ where
                     } else {
                         let value = self
                             .environment
-                            .intern(s.clone(), Rc::new(Some(Object::Symbol(s.clone()))));
+                            .intern(s.clone(), Arc::new(Some(Object::Symbol(s.clone()))));
                         return Ok(value);
                     }
                 }
                 Token::OpenList => self.read_list(),
                 Token::Quote => {
-                    Ok(Rc::new(Some(Object::Cons(
-                        Rc::new(Some(Object::Symbol(String::from("QUOTE")))),
-                        Rc::new(Some(Object::Cons(self.read()?, self.environment.get_nil()))),
+                    Ok(Arc::new(Some(Object::Cons(
+                        Arc::new(Some(Object::Symbol(String::from("QUOTE")))),
+                        Arc::new(Some(Object::Cons(self.read()?, Nil()))),
                     ))))
                 }
 
@@ -67,16 +67,16 @@ where
                 Token::Invalid(s) => unimplemented!("{:?}", s),
             }
         } else {
-            Ok(Rc::new(None))
+            Ok(Arc::new(None))
         }
     }
     fn read_list(&mut self) -> Result<RefObject> {
         if let Some(token) = self.tokenizer.token()? {
             if let Token::CloseList = token {
-                Ok(self.environment.get_nil())
+                ResultNil()
             } else {
                 self.tokenizer.putback(token);
-                Ok(Rc::new(Some(Object::Cons(
+                Ok(Arc::new(Some(Object::Cons(
                     self.read()?,
                     self.read_list()?,
                 ))))
