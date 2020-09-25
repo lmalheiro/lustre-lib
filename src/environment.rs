@@ -28,7 +28,7 @@ impl object::Environment for Environment {
 
         loop {
             if let Some(layer) = i.next() {
-                if let Some(value) = layer.get(symbol) {
+                if let Some(value) = layer.get(&symbol.to_uppercase()) {
                     break Some(Arc::clone(value));
                 }
             } else {
@@ -48,7 +48,7 @@ impl object::Environment for Environment {
         self.layers
             .last_mut()
             .unwrap()
-            .insert(symbol, Arc::clone(&value));
+            .insert(symbol.to_uppercase(), Arc::clone(&value));
         eprintln!("INTERN: {:?}", self.layers.last());
         value
     }

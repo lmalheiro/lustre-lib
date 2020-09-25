@@ -13,15 +13,15 @@ impl<'a> Evaluator<'a> {
         Evaluator { environment }
     }
 
-    pub fn eval(&self, obj: RefObject) -> ResultRefObject {
+    pub fn eval(&self, obj: &RefObject) -> ResultRefObject {
         match obj.as_ref() {
             None => ResultNil(),
             Some(Object::Cons(car, cdr)) => {
                 if let Some(Object::Symbol(s)) = car.as_ref() {
                     if s == "if" {
-                        let (car1, cdr) = destructure_list(cdr.clone())?;
-                        let (car2, cdr) = destructure_list(cdr)?;
-                        let (car3, _) = destructure_list(cdr)?;
+                        let (car1, cdr) = destructure_list(cdr)?;
+                        let (car2, cdr) = destructure_list(&cdr)?;
+                        let (car3, _) = destructure_list(&cdr)?;
                         let test = self.eval(car1)?;
                         if not_nil(&test) {
                             self.eval(car2)
@@ -29,37 +29,26 @@ impl<'a> Evaluator<'a> {
                             self.eval(car3)
                         }
                     } else if s == "QUOTE" {
-                        let (car, _) = destructure_list(cdr.clone())?;
-                        Ok(car)
+                        let (car, _) = destructure_list(cdr)?;
+                        Ok(Arc::clone(car))
                     } else {
-                        operators::apply(
-                            self.eval(car.clone())?,
-                            self.eval_list(cdr.clone())?,
-                            self.environment,
-                        )
+                        operators::apply(self.eval(car)?, self.eval_list(cdr)?, self.environment)
                     }
                 } else {
-                    operators::apply(
-                        self.eval(car.clone())?,
-                        self.eval_list(cdr.clone())?,
-                        self.environment,
-                    )
+                    operators::apply(self.eval(car)?, self.eval_list(cdr)?, self.environment)
                 }
             }
-            _ => Ok(obj),
+            _ => Ok(Arc::clone(obj)),
         }
     }
 
-    fn eval_list(&self, obj: RefObject) -> ResultRefObject {
+    fn eval_list(&self, obj: &RefObject) -> ResultRefObject {
         if not_nil(&obj) {
-            if let Some(Object::Cons(car, cdr)) = obj.as_ref() {
-                Ok(Arc::new(Some(Object::Cons(
-                    self.eval(car.clone())?,
-                    self.eval_list(cdr.clone())?,
-                ))))
-            } else {
-                panic!("Should exist a list here...")
-            }
+            let (car, cdr) = destructure_list(obj)?;
+            Object::Cons(
+                self.eval(car)?,
+                self.eval_list(cdr)?,
+            ).into()
         } else {
             ResultNil()
         }
@@ -74,49 +63,71 @@ mod tests {
     use std::io::prelude::*;
     use std::io::Cursor;
 
-    #[test]
-    #[ignore]
-    fn eval_test() {
-        let input = "1000";
-        let tokenizer = reader::tokenizer::Tokenizer::new(Cursor::new(input).bytes());
-        let mut environment = environment::Environment::new();
-        operators::initialize_operators(&mut environment);
-        let value = reader::Reader::new(tokenizer, &mut environment)
-            .read()
-            .unwrap();
-        eprintln!(">>>>>>{:?}", value);
-        if let Some(_) = value.as_ref() {
-            let evaluator = Evaluator::new(&mut environment);
-            let result = evaluator.eval(value);
-            if let Some(obj) = result.unwrap().as_ref() {
-                eprintln!("result: {}", obj);
+    macro_rules! test_eval {
+        ($code:expr; with $var:ident $test:block) => {
+            let input = $code;
+            let tokenizer = reader::tokenizer::Tokenizer::new(Cursor::new(input).bytes());
+            let mut environment = environment::Environment::new();
+            operators::initialize_operators(&mut environment);
+            let value = reader::Reader::new(tokenizer, &mut environment)
+                .read()
+                .unwrap();
+            if let Some(_) = value.as_ref() {
+                let evaluator = Evaluator::new(&mut environment);
+                let result = evaluator.eval(&value);
+                if let Some($var) = result.unwrap().as_ref() {
+                    eprintln!("result: {}", $var);
+                    $test;
+                }
+            } else {
+                panic!("Ooops! Not an object...")
             }
-        } else {
-            panic!("Ooops! Not an object...")
-        }
+        };
     }
 
     #[test]
-    fn eval_test_2() {
-        //let input = "(+ 1000 1000 (+ 10 10) (- 0 100 ))";
-        //let input = "(if (< 20 20) (if (> 30 20) \"TRUE-TRUE\" \"TRUE-FALSE\") \"FALSE\")";
-        let input = "'(a b c)";
-        let tokenizer = reader::tokenizer::Tokenizer::new(Cursor::new(input).bytes());
-        let mut environment = environment::Environment::new();
-        operators::initialize_operators(&mut environment);
-        let value = reader::Reader::new(tokenizer, &mut environment)
-            .read()
-            .unwrap();
-        eprintln!(">>>>>>{:?}", value);
-        if let Some(_) = value.as_ref() {
-            let evaluator = Evaluator::new(&mut environment);
-            let result = evaluator.eval(value);
-            eprintln!("result: {:?}", result);
-            if let Some(obj) = result.unwrap().as_ref() {
-                eprintln!("obj: {}", obj);
+    fn eval_test_1() {
+        test_eval! {
+            "(+ 1000 1000 (+ 10 10) (- 0 100 ))";
+            with obj {
+                assert_eq!(Object::Integer(1920), *obj);
             }
-        } else {
-            panic!("Ooops! Not an object...")
         }
+    }
+    
+
+    #[test]
+    fn eval_test_2() {
+
+        test_eval! {
+            "(if (< 10 20) (if (> 10 20) \"TRUE-TRUE\" \"TRUE-FALSE\") \"FALSE\")";
+            with obj {
+                assert_eq!(Object::IString("TRUE-FALSE".to_string()), *obj); 
+            }
+        }
+
+    }
+
+    #[test]
+    fn eval_test_3() {
+        test_eval! {
+            "'(a b c)";
+            with obj {
+                use crate::object::Object::*;
+                #[rustfmt::skip]
+                assert_eq!(
+                    Cons(
+                        Symbol("a".to_string()).into(),
+                        Cons(
+                            Symbol("b".to_string()).into(),
+                            Cons(Symbol("c".to_string()).into(), 
+                                 Nil()).into()
+                        ).into()
+                    ),
+                    *obj
+                ); 
+            }
+        }
+        
     }
 }
