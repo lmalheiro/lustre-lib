@@ -15,10 +15,10 @@ impl<'a> Evaluator<'a> {
 
     pub fn eval(&self, obj: &RefObject) -> ResultRefObject {
         match obj.as_ref() {
-            None => ResultNil(),
+            None => result_nil(),
             Some(Object::Cons(car, cdr)) => {
                 if let Some(Object::Symbol(s)) = car.as_ref() {
-                    if s == "if" {
+                    if s == "IF" {
                         let (car1, cdr) = destructure_list(cdr)?;
                         let (car2, cdr) = destructure_list(&cdr)?;
                         let (car3, _) = destructure_list(&cdr)?;
@@ -50,7 +50,7 @@ impl<'a> Evaluator<'a> {
                 self.eval_list(cdr)?,
             ).into()
         } else {
-            ResultNil()
+            result_nil()
         }
     }
 }
@@ -72,12 +72,16 @@ mod tests {
             let value = reader::Reader::new(tokenizer, &mut environment)
                 .read()
                 .unwrap();
+            eprintln!("reader: {:?}", value);
             if let Some(_) = value.as_ref() {
                 let evaluator = Evaluator::new(&mut environment);
                 let result = evaluator.eval(&value);
+                eprintln!("result: {:?}", result);
                 if let Some($var) = result.unwrap().as_ref() {
                     eprintln!("result: {}", $var);
                     $test;
+                } else {
+                    panic!("Ooops! Not an object...")
                 }
             } else {
                 panic!("Ooops! Not an object...")
@@ -117,11 +121,11 @@ mod tests {
                 #[rustfmt::skip]
                 assert_eq!(
                     Cons(
-                        Symbol("a".to_string()).into(),
+                        Symbol("A".to_string()).into(),
                         Cons(
-                            Symbol("b".to_string()).into(),
-                            Cons(Symbol("c".to_string()).into(), 
-                                 Nil()).into()
+                            Symbol("B".to_string()).into(),
+                            Cons(Symbol("C".to_string()).into(), 
+                                 nil()).into()
                         ).into()
                     ),
                     *obj
@@ -130,4 +134,37 @@ mod tests {
         }
         
     }
+
+    #[test]
+    fn eval_test_4() {
+
+        #[rustfmt::skip]
+        test_eval! {
+            "(if (and (< 10 20) 
+                      (> 30 15)) 
+                 (if (or (> 10 20) 
+                         (> 20 (* 3 5)))
+                     \"TRUE-TRUE\" 
+                     \"TRUE-FALSE\") 
+                \"FALSE\")";
+            with obj {
+                assert_eq!(Object::IString("TRUE-TRUE".to_string()), *obj); 
+            }
+        }
+
+    }
+
+    #[test]
+    fn eval_test_5() {
+        test_eval! {
+            "(car (cdr '(X 100 b c)))";
+            with obj {
+                use crate::object::Object::*;
+                #[rustfmt::skip]
+                assert_eq!(Integer(100), *obj); 
+            }
+        }
+        
+    }
+
 }

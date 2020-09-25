@@ -8,11 +8,11 @@ pub type ResultRefObject = errors::Result<RefObject>;
 pub type DestrucuturedCons<'a> = (&'a RefObject, &'a RefObject);
 pub type ResultDestrucuturedCons<'a> = errors::Result<DestrucuturedCons<'a>>;
 
-pub fn Nil() -> RefObject {
+pub fn nil() -> RefObject {
     Arc::new(None)
 }
 
-pub fn ResultNil() -> ResultRefObject {
+pub fn result_nil() -> ResultRefObject {
     Ok(Arc::new(None))
 }
 

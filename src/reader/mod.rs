@@ -2,7 +2,7 @@
 pub mod tokenizer;
 
 use crate::reader::tokenizer::*;
-use crate::object::{Object, RefObject, Environment, Nil, ResultNil};
+use crate::object::{Object, RefObject, Environment, nil, result_nil};
 
 use crate::errors::Result;
 use std::sync::Arc;
@@ -48,7 +48,7 @@ where
                     } else {
                         let value = self
                             .environment
-                            .intern(s.clone(), Arc::new(Some(Object::Symbol(s.clone()))));
+                            .intern(s.to_uppercase(), Arc::new(Some(Object::Symbol(s.to_uppercase()))));
                         return Ok(value);
                     }
                 }
@@ -56,7 +56,7 @@ where
                 Token::Quote => {
                     Ok(Arc::new(Some(Object::Cons(
                         Arc::new(Some(Object::Symbol(String::from("QUOTE")))),
-                        Arc::new(Some(Object::Cons(self.read()?, Nil()))),
+                        Arc::new(Some(Object::Cons(self.read()?, nil()))),
                     ))))
                 }
 
@@ -73,7 +73,7 @@ where
     fn read_list(&mut self) -> Result<RefObject> {
         if let Some(token) = self.tokenizer.token()? {
             if let Token::CloseList = token {
-                ResultNil()
+                result_nil()
             } else {
                 self.tokenizer.putback(token);
                 Ok(Arc::new(Some(Object::Cons(

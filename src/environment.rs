@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::object;
-use crate::object::{RefObject, Nil};
+use crate::object::{RefObject, nil};
 
 pub struct Environment {
     layers: Vec<HashMap<String, RefObject>>,
@@ -14,7 +14,7 @@ impl Environment {
             layers: vec![HashMap::new()]
         };
         use crate::object::Environment;
-        value.intern("nil".to_string(), Nil());
+        value.intern("nil".to_string(), nil());
         value
     }
 }
@@ -22,7 +22,7 @@ impl Environment {
 impl object::Environment for Environment {
     
     fn find_symbol(&self, symbol: &String) -> Option<RefObject> {
-        eprintln!("FIND: {:?}", self.layers.last());
+        //eprintln!("FIND: {:?}", self.layers.last());
 
         let mut i = self.layers.iter().rev();
 
@@ -49,7 +49,7 @@ impl object::Environment for Environment {
             .last_mut()
             .unwrap()
             .insert(symbol.to_uppercase(), Arc::clone(&value));
-        eprintln!("INTERN: {:?}", self.layers.last());
+        //eprintln!("INTERN: {:?}", self.layers.last());
         value
     }
     fn unintern(&mut self, symbol: &String) {
