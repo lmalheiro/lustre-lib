@@ -31,7 +31,7 @@ pub enum Object {
     Integer(i32),
     IString(String),
     Cons(RefObject, RefObject),
-    Function(RefObject),
+    Lambda(RefObject, RefObject),
     Operator(Op),
     Symbol(String),
 }
@@ -43,7 +43,7 @@ impl PartialEq for Object {
             (Integer(v1), Integer(v2)) => v1 == v2,
             (IString(v1), IString(v2)) => v1 == v2,
             (Cons(v11, v12), Cons(v21, v22)) => v11.as_ref() == v21.as_ref() && v12 == v22,
-            (Function(_v1), Function(_v2)) => unimplemented!(),
+            (Lambda(v11, v12), Lambda(v21, v22)) => v11.as_ref() == v21.as_ref() && v12 == v22,
             (Operator(_v1), Operator(_v2)) => unimplemented!(),
             (Symbol(v1), Symbol(v2)) => v1 == v2,
             (_, _) => false,
@@ -88,7 +88,16 @@ impl Object {
                     .unwrap()
                     .helper_fmt(f)
             }
-            Object::Function(_) => write!(f, "FUNCTION"),
+            Object::Lambda(params, expression) => write!(
+                f,
+                "( LAMBDA {} {} )",
+                params.as_ref().as_ref()
+                    .or(Some(&Object::IString(String::from("()"))))
+                    .unwrap(),
+                expression.as_ref().as_ref()
+                    .or(Some(&Object::IString(String::from(""))))
+                    .unwrap()
+            ),
             Object::Operator(_) => write!(f, "OPERATOR"),
         }
     }

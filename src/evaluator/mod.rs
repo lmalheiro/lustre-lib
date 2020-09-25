@@ -31,11 +31,14 @@ impl<'a> Evaluator<'a> {
                     } else if s == "QUOTE" {
                         let (car, _) = destructure_list(cdr)?;
                         Ok(Arc::clone(car))
+                    } else if s == "LAMBDA" {
+                        let (_, cdr) = destructure_list(cdr)?;
+                        self.mk_lambda(cdr.clone(), self.environment)
                     } else {
-                        operators::apply(self.eval(car)?, self.eval_list(cdr)?, self.environment)
+                        self.apply(self.eval(car)?, self.eval_list(cdr)?, self.environment)
                     }
                 } else {
-                    operators::apply(self.eval(car)?, self.eval_list(cdr)?, self.environment)
+                    self.apply(self.eval(car)?, self.eval_list(cdr)?, self.environment)
                 }
             }
             _ => Ok(Arc::clone(obj)),
@@ -45,12 +48,27 @@ impl<'a> Evaluator<'a> {
     fn eval_list(&self, obj: &RefObject) -> ResultRefObject {
         if not_nil(&obj) {
             let (car, cdr) = destructure_list(obj)?;
-            Object::Cons(
-                self.eval(car)?,
-                self.eval_list(cdr)?,
-            ).into()
+            Object::Cons(self.eval(car)?, self.eval_list(cdr)?).into()
         } else {
             result_nil()
+        }
+    }
+
+    fn mk_lambda(&self, obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
+        let (car1, cdr) = destructure_list(&obj)?;
+        let (car2, _) = destructure_list(cdr)?;
+        unimplemented!()
+    }
+
+    fn apply(&self, function: RefObject, obj: RefObject, env: &dyn Environment) -> ResultRefObject {
+        match function
+            .as_ref()
+            .as_ref()
+            .expect("Expecting a value, instead got nil or other None value.")
+        {
+            Object::Lambda(_parameters, _expression) => unimplemented!(),
+            Object::Operator(f) => f(obj, env),
+            _ => panic!("Expected operator or function."),
         }
     }
 }
@@ -98,18 +116,15 @@ mod tests {
             }
         }
     }
-    
 
     #[test]
     fn eval_test_2() {
-
         test_eval! {
             "(if (< 10 20) (if (> 10 20) \"TRUE-TRUE\" \"TRUE-FALSE\") \"FALSE\")";
             with obj {
-                assert_eq!(Object::IString("TRUE-FALSE".to_string()), *obj); 
+                assert_eq!(Object::IString("TRUE-FALSE".to_string()), *obj);
             }
         }
-
     }
 
     #[test]
@@ -124,20 +139,18 @@ mod tests {
                         Symbol("A".to_string()).into(),
                         Cons(
                             Symbol("B".to_string()).into(),
-                            Cons(Symbol("C".to_string()).into(), 
+                            Cons(Symbol("C".to_string()).into(),
                                  nil()).into()
                         ).into()
                     ),
                     *obj
-                ); 
+                );
             }
         }
-        
     }
 
     #[test]
     fn eval_test_4() {
-
         #[rustfmt::skip]
         test_eval! {
             "(if (and (< 10 20) 
@@ -151,7 +164,6 @@ mod tests {
                 assert_eq!(Object::IString("TRUE-TRUE".to_string()), *obj); 
             }
         }
-
     }
 
     #[test]
@@ -161,10 +173,20 @@ mod tests {
             with obj {
                 use crate::object::Object::*;
                 #[rustfmt::skip]
-                assert_eq!(Integer(100), *obj); 
+                assert_eq!(Integer(100), *obj);
             }
         }
-        
     }
 
+    #[test]
+    fn eval_test_6() {
+        test_eval! {
+            "(lambda (x y) (+ x y))";
+            with obj {
+                use crate::object::Object::*;
+                #[rustfmt::skip]
+                assert_eq!(Integer(100), *obj);
+            }
+        }
+    }
 }

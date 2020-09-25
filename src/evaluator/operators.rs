@@ -149,18 +149,6 @@ pub fn quote(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
     Ok(Arc::clone(car))
 }
 
-pub fn apply(function: RefObject, obj: RefObject, env: &dyn Environment) -> ResultRefObject {
-    match function
-        .as_ref()
-        .as_ref()
-        .expect("Expecting a value, instead got nil or other None value.")
-    {
-        Object::Function(_value) => unimplemented!(),
-        Object::Operator(f) => f(obj, env),
-        _ => panic!("Expected operator or function."),
-    }
-}
-
 pub fn initialize_operators(environment: &mut dyn Environment) {
     environment.intern(
         String::from("QUOTE"),
