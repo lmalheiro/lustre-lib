@@ -33,12 +33,22 @@ impl<'a> Evaluator<'a> {
                         Ok(Arc::clone(car))
                     } else if s == "LAMBDA" {
                         self.lambda(cdr)
+                    } else if s == "DEF" {
+                        eprintln!(">>>DEF cdr>>>: {:?}", cdr);
+                        let (name, cdr) = destructure_list(cdr)?;
+                        let (lambda, _) = destructure_list(cdr)?;
+                        eprintln!(">>>DEF name>>>: {:?}", name);
+                        eprintln!(">>>DEF func>>>: {:?}", lambda);
+                        let name = self.eval(name)?;
+                        eprintln!(">>>DEF name>>>: {:?}", name);
+                        let lambda = self.eval(lambda)?;
+                        eprintln!(">>>DEF func>>>: {:?}", lambda);
+                        Ok(self.environment.intern(symbol_value(&name)?, lambda))
                     } else {
                         let car_eval = self.eval(car)?;
                         let cdr_eval = self.eval_list(cdr)?;
-                        eprintln!(">>>apply op>>>: {:?}", car_eval);
-                        eprintln!(">>>apply param>>>: {:?}", cdr_eval);
-                        
+                        // eprintln!(">>>apply op>>>: {:?}", car_eval);
+                        // eprintln!(">>>apply param>>>: {:?}", cdr_eval);
                         self.apply(car_eval, cdr_eval)
                     }
                 } else {
@@ -46,14 +56,11 @@ impl<'a> Evaluator<'a> {
                     let cdr_eval = self.eval_list(cdr)?;
                     self.apply(car_eval, cdr_eval)
                 }
-            },
-            Some(Object::Symbol(s)) => {
-                match self.environment.find_symbol(s) {
-                    Some(v) =>  Ok(Arc::clone(&v)),
-                    _ => panic!("Unbound!")
-                }
-               
             }
+            Some(Object::Symbol(s)) => match self.environment.find_symbol(s) {
+                Some(v) => Ok(Arc::clone(&v)),
+                _ => panic!("Unbound!"),
+            },
             _ => Ok(Arc::clone(obj)),
         }
     }
@@ -220,5 +227,44 @@ mod tests {
                 assert_eq!(Integer(34), *obj);
             }
         }
+    }
+
+    #[test]
+    fn eval_test_7() {
+        let input = "(def 'add (lambda (x y) (+ x y))) (add 13 21)";
+        let tokenizer = reader::tokenizer::Tokenizer::new(Cursor::new(input).bytes());
+        let mut environment = environment::Environment::new();
+        operators::initialize_operators(&mut environment);
+        let mut reader = reader::Reader::new(tokenizer, &mut environment);
+        let value = reader.read().unwrap();
+        eprintln!("reader: {:?}", value);
+        let mut evaluator = Evaluator::new(&mut environment);
+        if let Some(_) = value.as_ref() {
+            
+            let result = evaluator.eval(&value);
+            eprintln!("result: {:?}", result);
+            if let Some(obj) = result.unwrap().as_ref() {
+                eprintln!("result: {}", obj)
+            } else {
+                panic!("Ooops! Not an object...")
+            }
+        } else {
+            panic!("Ooops! Not an object...")
+        }
+        let value = reader.read().unwrap();
+        eprintln!("reader: {:?}", value);
+        //     if let Some(_) = value.as_ref() {
+        //         let mut evaluator = Evaluator::new(&mut environment);
+        //         let result = evaluator.eval(&value);
+        //         eprintln!("result: {:?}", result);
+        //         if let Some($var) = result.unwrap().as_ref() {
+        //             eprintln!("result: {}", $var)
+        //         } else {
+        //             panic!("Ooops! Not an object...")
+        //         }
+        //     } else {
+        //         panic!("Ooops! Not an object...")
+        //     }
+        // }
     }
 }
