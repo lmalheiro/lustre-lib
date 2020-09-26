@@ -95,7 +95,6 @@ mod tests {
     use crate::environment;
 
     #[test]
-    #[ignore]
     fn reader_test() {
         let input = "(defun κόσμε (x y) (* (+ x y) 10))";
         let tokenizer = Tokenizer::new(Cursor::new(input).bytes());
@@ -106,7 +105,7 @@ mod tests {
         if let Some(object) = b.as_ref() {
             eprintln!("result: {}", object);
 
-            assert_eq!("( defun κόσμε ( x y ) ( * ( + x y ) 10 ) )", format!("{}", object));
+            assert_eq!("( DEFUN ΚΌΣΜΕ ( X Y ) ( * ( + X Y ) 10u32 ) )", format!("{}", object));
         } else {
             panic!("Ooops! Not an object...")
         }

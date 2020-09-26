@@ -13,7 +13,7 @@ impl<'a> Evaluator<'a> {
         Evaluator { environment }
     }
 
-    pub fn eval(&self, obj: &RefObject) -> ResultRefObject {
+    pub fn eval(&mut self, obj: &RefObject) -> ResultRefObject {
         match obj.as_ref() {
             None => result_nil(),
             Some(Object::Cons(car, cdr)) => {
@@ -32,19 +32,33 @@ impl<'a> Evaluator<'a> {
                         let (car, _) = destructure_list(cdr)?;
                         Ok(Arc::clone(car))
                     } else if s == "LAMBDA" {
-                        self.mk_lambda(cdr)
+                        self.lambda(cdr)
                     } else {
-                        self.apply(self.eval(car)?, self.eval_list(cdr)?)
+                        let car_eval = self.eval(car)?;
+                        let cdr_eval = self.eval_list(cdr)?;
+                        eprintln!(">>>apply op>>>: {:?}", car_eval);
+                        eprintln!(">>>apply param>>>: {:?}", cdr_eval);
+                        
+                        self.apply(car_eval, cdr_eval)
                     }
                 } else {
-                    self.apply(self.eval(car)?, self.eval_list(cdr)?)
+                    let car_eval = self.eval(car)?;
+                    let cdr_eval = self.eval_list(cdr)?;
+                    self.apply(car_eval, cdr_eval)
                 }
+            },
+            Some(Object::Symbol(s)) => {
+                match self.environment.find_symbol(s) {
+                    Some(v) =>  Ok(Arc::clone(&v)),
+                    _ => panic!("Unbound!")
+                }
+               
             }
             _ => Ok(Arc::clone(obj)),
         }
     }
 
-    fn eval_list(&self, obj: &RefObject) -> ResultRefObject {
+    fn eval_list(&mut self, obj: &RefObject) -> ResultRefObject {
         if not_nil(&obj) {
             let (car, cdr) = destructure_list(obj)?;
             Object::Cons(self.eval(car)?, self.eval_list(cdr)?).into()
@@ -53,24 +67,39 @@ impl<'a> Evaluator<'a> {
         }
     }
 
-    fn mk_lambda(&self, obj: &RefObject) -> ResultRefObject {
+    fn lambda(&self, obj: &RefObject) -> ResultRefObject {
         let (params, cdr) = destructure_list(obj)?;
         let (expression, _) = destructure_list(cdr)?;
         Object::Lambda(params.clone(), expression.clone()).into()
     }
 
-    fn apply(&self, function: RefObject, obj: RefObject) -> ResultRefObject {
+    fn apply(&mut self, function: RefObject, cdr: RefObject) -> ResultRefObject {
         match function
             .as_ref()
             .as_ref()
             .expect("Expecting a value, instead got nil or other None value.")
         {
-            Object::Lambda(_parameters, _expression) => {
+            Object::Lambda(parameters, expression) => {
                 self.environment.new_layer();
-
-                result_nil()
-            },
-            Object::Operator(_, f) => f(obj, self.environment),
+                eprintln!(">>>VALUES>>> {:?}", cdr);
+                eprintln!(">>>EXPR>>> {:?}", expression);
+                let values = self.eval_list(&cdr)?;
+                let mut next_value = &values;
+                let mut next_param = parameters;
+                while not_nil(next_value) && not_nil(next_param) {
+                    let (value, cdr_value) = destructure_list(next_value)?;
+                    let (param, cdr_param) = destructure_list(next_param)?;
+                    eprintln!(">>>VALUE>>> {:?}", value);
+                    eprintln!(">>>PARAM>>> {:?}", param);
+                    self.environment.intern(symbol_value(param)?, value.clone());
+                    next_value = cdr_value;
+                    next_param = cdr_param;
+                }
+                let result = self.eval(expression);
+                self.environment.drop_layer();
+                Ok(result?)
+            }
+            Object::Operator(_, f) => f(cdr, self.environment),
             _ => panic!("Expected operator or function."),
         }
     }
@@ -95,7 +124,7 @@ mod tests {
                 .unwrap();
             eprintln!("reader: {:?}", value);
             if let Some(_) = value.as_ref() {
-                let evaluator = Evaluator::new(&mut environment);
+                let mut evaluator = Evaluator::new(&mut environment);
                 let result = evaluator.eval(&value);
                 eprintln!("result: {:?}", result);
                 if let Some($var) = result.unwrap().as_ref() {
@@ -184,11 +213,11 @@ mod tests {
     #[test]
     fn eval_test_6() {
         test_eval! {
-            "(lambda (x y) (+ x y))";
+            "((lambda (x y) (+ x y)) 13 21)";
             with obj {
                 use crate::object::Object::*;
                 #[rustfmt::skip]
-                assert_eq!(Integer(100), *obj);
+                assert_eq!(Integer(34), *obj);
             }
         }
     }

@@ -70,7 +70,7 @@ impl Object {
         f: &mut std::fmt::Formatter<'_>,
     ) -> std::result::Result<(), std::fmt::Error> {
         match self {
-            Object::Integer(v) => write!(f, "{}", v),
+            Object::Integer(v) => write!(f, "{}u32", v),
             Object::IString(v) => write!(f, "{}", v),
             Object::Symbol(v) => write!(f, "{}", v),
             Object::Cons(car, cdr) => {
@@ -90,7 +90,7 @@ impl Object {
             }
             Object::Lambda(params, expression) => write!(
                 f,
-                "( LAMBDA {} {} )",
+                "( LMBD {} {} )",
                 params.as_ref().as_ref()
                     .or(Some(&Object::IString(String::from("()"))))
                     .unwrap(),

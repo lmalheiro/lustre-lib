@@ -219,7 +219,6 @@ mod tests {
     use std::io::Cursor;
 
     #[test]
-    #[ignore]
     fn get_tokens() {
         macro_rules! s {
             ($value:expr) => {
