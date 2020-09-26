@@ -17,7 +17,6 @@ pub fn result_nil() -> ResultRefObject {
 }
 
 pub trait Environment {
-    //fn get_nil(&self) -> RefObject;
     fn find_symbol(&self, symbol: &String) -> Option<RefObject>;
     fn new_layer(&mut self);
     fn drop_layer(&mut self);
