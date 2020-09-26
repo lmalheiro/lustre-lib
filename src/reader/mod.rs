@@ -90,7 +90,7 @@ mod tests {
             eprintln!("result: {}", object);
 
             assert_eq!(
-                "( DEFUN ΚΌΣΜΕ ( X Y ) ( * ( + X Y ) 10u32 ) )",
+                "( DEFUN ΚΌΣΜΕ ( X Y ) ( * ( + X Y ) 10 ) )",
                 format!("{}", object)
             );
         } else {

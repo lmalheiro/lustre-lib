@@ -1,10 +1,10 @@
-mod operators;
+pub mod operators;
 
 use std::sync::Arc;
 
 use crate::object::*;
 
-struct Evaluator<'a> {
+pub struct Evaluator<'a> {
     environment: &'a mut dyn Environment,
 }
 
@@ -34,21 +34,14 @@ impl<'a> Evaluator<'a> {
                     } else if s == "LAMBDA" {
                         self.lambda(cdr)
                     } else if s == "DEF" {
-                        eprintln!(">>>DEF cdr>>>: {:?}", cdr);
                         let (name, cdr) = destructure_list(cdr)?;
                         let (lambda, _) = destructure_list(cdr)?;
-                        eprintln!(">>>DEF name>>>: {:?}", name);
-                        eprintln!(">>>DEF func>>>: {:?}", lambda);
                         let name = self.eval(name)?;
-                        eprintln!(">>>DEF name>>>: {:?}", name);
                         let lambda = self.eval(lambda)?;
-                        eprintln!(">>>DEF func>>>: {:?}", lambda);
                         Ok(self.environment.intern(symbol_value(&name)?, lambda))
                     } else {
                         let car_eval = self.eval(car)?;
                         let cdr_eval = self.eval_list(cdr)?;
-                        // eprintln!(">>>apply op>>>: {:?}", car_eval);
-                        // eprintln!(">>>apply param>>>: {:?}", cdr_eval);
                         self.apply(car_eval, cdr_eval)
                     }
                 } else {
@@ -88,16 +81,12 @@ impl<'a> Evaluator<'a> {
         {
             Object::Lambda(parameters, expression) => {
                 self.environment.new_layer();
-                eprintln!(">>>VALUES>>> {:?}", cdr);
-                eprintln!(">>>EXPR>>> {:?}", expression);
                 let values = self.eval_list(&cdr)?;
                 let mut next_value = &values;
                 let mut next_param = parameters;
                 while not_nil(next_value) && not_nil(next_param) {
                     let (value, cdr_value) = destructure_list(next_value)?;
                     let (param, cdr_param) = destructure_list(next_param)?;
-                    eprintln!(">>>VALUE>>> {:?}", value);
-                    eprintln!(">>>PARAM>>> {:?}", param);
                     self.environment.intern(symbol_value(param)?, value.clone());
                     next_value = cdr_value;
                     next_param = cdr_param;

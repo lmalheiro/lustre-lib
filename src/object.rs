@@ -55,7 +55,7 @@ impl Debug for Object {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         match self {
             Object::Cons(_, _) => {
-                write!(f, "(");
+                write!(f, "(")?;
                 self.helper_fmt(f)?;
                 write!(f, " )")
             }
@@ -70,34 +70,32 @@ impl Object {
         f: &mut std::fmt::Formatter<'_>,
     ) -> std::result::Result<(), std::fmt::Error> {
         match self {
-            Object::Integer(v) => write!(f, "{}u32", v),
-            Object::IString(v) => write!(f, "{}", v),
+            Object::Integer(v) => write!(f, "{}", v),
+            Object::IString(v) => write!(f, "\"{}\"", v),
             Object::Symbol(v) => write!(f, "{}", v),
             Object::Cons(car, cdr) => {
-                write!(
-                    f,
-                    " {}",
-                    car.as_ref()
-                        .as_ref()
-                        .or(Some(&Object::IString(String::from(""))))
-                        .unwrap()
-                );
-                cdr.as_ref()
-                    .as_ref()
-                    .or(Some(&Object::IString(String::from(""))))
-                    .unwrap()
-                    .helper_fmt(f)
+                if let Some(v) = car.as_ref().as_ref() {
+                    write!(f, " {}", v)?
+                }
+                if let Some(v) = cdr.as_ref().as_ref() {
+                    v.helper_fmt(f)
+                } else {
+                    Ok(())
+                }
             }
-            Object::Lambda(params, expression) => write!(
-                f,
-                "( LMBD {} {} )",
-                params.as_ref().as_ref()
-                    .or(Some(&Object::IString(String::from("()"))))
-                    .unwrap(),
-                expression.as_ref().as_ref()
-                    .or(Some(&Object::IString(String::from(""))))
-                    .unwrap()
-            ),
+            Object::Lambda(params, expression) => {
+                write!(f, "( LAMBDA ")?;
+                if let Some(v) = params.as_ref().as_ref() {
+                    write!(f, " {}", v)?
+                } else {
+                    write!(f, " ()")?
+                }
+                if let Some(v) = expression.as_ref().as_ref() {
+                    write!(f, " {} )", v)
+                } else {
+                    write!(f, " )")
+                } 
+            }
             Object::Operator(n, _) => write!(f, "{}", n),
         }
     }
@@ -119,19 +117,12 @@ impl Display for Object {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         match self {
             Object::Cons(_, _) => {
-                write!(f, "(");
+                write!(f, "(")?;
                 self.helper_fmt(f)?;
                 write!(f, " )")
             }
             _ => self.helper_fmt(f),
         }
-    }
-}
-
-pub fn is_nil(obj: &RefObject) -> bool {
-    match obj.as_ref() {
-        Some(_) => false,
-        None => true,
     }
 }
 
