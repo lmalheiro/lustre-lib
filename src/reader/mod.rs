@@ -1,18 +1,16 @@
-
 pub mod tokenizer;
 
+use crate::object::{nil, result_nil, Object, RefObject};
 use crate::reader::tokenizer::*;
-use crate::object::{Object, RefObject, Environment, nil, result_nil};
 
 use crate::errors::Result;
 use std::sync::Arc;
 
-pub struct Reader<'a, T>
+pub struct Reader<T>
 where
     T: Iterator,
 {
     tokenizer: Tokenizer<T>,
-    environment: &'a mut dyn Environment,
 }
 
 macro_rules! r#return {
@@ -24,15 +22,12 @@ macro_rules! r#return {
     };
 }
 
-impl<'a, T> Reader<'a, T>
+impl<T> Reader<T>
 where
     T: Iterator<Item = std::result::Result<u8, std::io::Error>>,
 {
-    pub fn new(tokenizer: Tokenizer<T>, environment: &'a mut dyn Environment) -> Self {
-        Self {
-            tokenizer,
-            environment,
-        }
+    pub fn new(tokenizer: Tokenizer<T>) -> Self {
+        Self { tokenizer }
     }
     pub fn read(&mut self) -> Result<RefObject> {
         if let Some(token) = self.tokenizer.token()? {
@@ -42,25 +37,16 @@ where
                     r#return!(Integer; value);
                 }
                 Token::Text(s) => r#return!(IString; s),
-                Token::Identifier(s) => {
-                    if let Some(value) = self.environment.find_symbol(&s) {
-                        return Ok(value);
-                    } else {
-                        let value = self
-                            .environment
-                            .intern(s.to_uppercase(), Arc::new(Some(Object::Symbol(s.to_uppercase()))));
-                        return Ok(value);
-                    }
-                }
+                Token::Identifier(s) => r#return!(Symbol; s.to_uppercase() ),
                 Token::OpenList => self.read_list(),
-                Token::Quote => {
-                    Ok(Arc::new(Some(Object::Cons(
-                        Arc::new(Some(Object::Symbol(String::from("QUOTE")))),
-                        Arc::new(Some(Object::Cons(self.read()?, nil()))),
-                    ))))
-                }
+                Token::Quote => Ok(Arc::new(Some(Object::Cons(
+                    Arc::new(Some(Object::Symbol(String::from("QUOTE")))),
+                    Arc::new(Some(Object::Cons(self.read()?, nil()))),
+                )))),
 
-                Token::NoToken => panic!("Inconsistent state sice NoToken isn't a valid return value."),
+                Token::NoToken => {
+                    panic!("Inconsistent state sice NoToken isn't a valid return value.")
+                }
                 Token::Quasiquote => unimplemented!(),
                 Token::Unquote => unimplemented!(),
                 Token::CloseList => panic!("Unexpected end of a list."),
@@ -92,24 +78,23 @@ mod tests {
     use super::*;
     use std::io::prelude::*;
     use std::io::Cursor;
-    use crate::environment;
 
     #[test]
     fn reader_test() {
         let input = "(defun κόσμε (x y) (* (+ x y) 10))";
         let tokenizer = Tokenizer::new(Cursor::new(input).bytes());
-        let mut environment = environment::Environment::new();
-        let mut reader = Reader::new(tokenizer, &mut environment);
+        let mut reader = Reader::new(tokenizer);
         let a = reader.read();
         let b = a.unwrap();
         if let Some(object) = b.as_ref() {
             eprintln!("result: {}", object);
 
-            assert_eq!("( DEFUN ΚΌΣΜΕ ( X Y ) ( * ( + X Y ) 10u32 ) )", format!("{}", object));
+            assert_eq!(
+                "( DEFUN ΚΌΣΜΕ ( X Y ) ( * ( + X Y ) 10u32 ) )",
+                format!("{}", object)
+            );
         } else {
             panic!("Ooops! Not an object...")
         }
-
-        
     }
 }

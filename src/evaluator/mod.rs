@@ -126,9 +126,7 @@ mod tests {
             let tokenizer = reader::tokenizer::Tokenizer::new(Cursor::new(input).bytes());
             let mut environment = environment::Environment::new();
             operators::initialize_operators(&mut environment);
-            let value = reader::Reader::new(tokenizer, &mut environment)
-                .read()
-                .unwrap();
+            let value = reader::Reader::new(tokenizer).read().unwrap();
             eprintln!("reader: {:?}", value);
             if let Some(_) = value.as_ref() {
                 let mut evaluator = Evaluator::new(&mut environment);
@@ -235,36 +233,54 @@ mod tests {
         let tokenizer = reader::tokenizer::Tokenizer::new(Cursor::new(input).bytes());
         let mut environment = environment::Environment::new();
         operators::initialize_operators(&mut environment);
-        let mut reader = reader::Reader::new(tokenizer, &mut environment);
-        let value = reader.read().unwrap();
-        eprintln!("reader: {:?}", value);
+        let mut reader = reader::Reader::new(tokenizer);
         let mut evaluator = Evaluator::new(&mut environment);
-        if let Some(_) = value.as_ref() {
-            
-            let result = evaluator.eval(&value);
-            eprintln!("result: {:?}", result);
-            if let Some(obj) = result.unwrap().as_ref() {
-                eprintln!("result: {}", obj)
+
+        let mut result: ResultRefObject = result_nil();
+        loop {
+            let ast = reader.read().unwrap();
+            eprintln!("reader: {:?}", ast);
+            if ast.as_ref().is_some() {
+                result = evaluator.eval(&ast);
             } else {
-                panic!("Ooops! Not an object...")
+                break;
             }
-        } else {
-            panic!("Ooops! Not an object...")
         }
-        let value = reader.read().unwrap();
-        eprintln!("reader: {:?}", value);
-        //     if let Some(_) = value.as_ref() {
-        //         let mut evaluator = Evaluator::new(&mut environment);
-        //         let result = evaluator.eval(&value);
-        //         eprintln!("result: {:?}", result);
-        //         if let Some($var) = result.unwrap().as_ref() {
-        //             eprintln!("result: {}", $var)
-        //         } else {
-        //             panic!("Ooops! Not an object...")
-        //         }
-        //     } else {
-        //         panic!("Ooops! Not an object...")
-        //     }
-        // }
+        
+        assert_eq!(Object::Integer(34), *result.unwrap().as_ref().as_ref().unwrap());
+
+        
+    }
+
+    #[test]
+    fn eval_test_8() {
+        let input = "
+        (def 'fact (lambda (n) 
+                     (if (< n 1) 
+                       1
+                       (* n 
+                          (fact (- n 1)))
+                         ))) 
+        (fact 7)";
+        let tokenizer = reader::tokenizer::Tokenizer::new(Cursor::new(input).bytes());
+        let mut environment = environment::Environment::new();
+        operators::initialize_operators(&mut environment);
+        let mut reader = reader::Reader::new(tokenizer);
+        let mut evaluator = Evaluator::new(&mut environment);
+
+        let mut result: ResultRefObject = result_nil();
+        loop {
+            let ast = reader.read().unwrap();
+            eprintln!("reader: {:?}", ast);
+            if ast.as_ref().is_some() {
+                result = evaluator.eval(&ast);
+            } else {
+                break;
+            }
+        }
+        eprintln!("result: {:?}", result);
+        assert_eq!(Object::Integer(5040), *result.unwrap().as_ref().as_ref().unwrap());
+
+        
     }
 }
