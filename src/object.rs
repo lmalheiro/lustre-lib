@@ -1,4 +1,4 @@
-use crate::errors;
+use crate::errors::{self, Error};
 use std::fmt::Debug;
 use std::fmt::Display;
 use std::sync::Arc;
@@ -136,7 +136,7 @@ pub fn destructure_list<'a>(list: &'a RefObject) -> ResultDestrucuturedCons<'a> 
     if let Some(Object::Cons(car, cdr)) = list.as_ref() {
         Ok((car, cdr))
     } else {
-        Err(errors::Error::NotCons)
+        Err(Error::NotCons)
     }
 }
 
@@ -144,7 +144,7 @@ pub fn symbol_value(sym: &RefObject) -> errors::Result<String> {
     if let Some(Object::Symbol(value)) = sym.as_ref() {
         Ok(value.to_string())
     } else {
-        Err(errors::Error::NotSymbol)
+        Err(Error::NotSymbol)
     }
 }
 
@@ -152,6 +152,6 @@ pub fn integer_value(int: &RefObject) -> errors::Result<i32> {
     if let Some(Object::Integer(value)) = int.as_ref() {
         Ok(*value)
     } else {
-        Err(errors::Error::NotInteger)
+        Err(Error::NotInteger)
     }
 }
