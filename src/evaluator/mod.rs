@@ -1,10 +1,10 @@
 pub mod operators;
 
-//use futures::future::ok;
 use std::sync::Arc;
 
 use crate::environment::Environment;
 use crate::object::*;
+use crate::eval_workers::*;
 
 pub fn eval(obj: &RefObject, environment: &mut Environment) -> ResultRefObject {
     match obj.as_ref() {
@@ -54,11 +54,6 @@ pub fn eval(obj: &RefObject, environment: &mut Environment) -> ResultRefObject {
         _ => Ok(Arc::clone(obj)),
     }
 }
-
-// async fn async_eval<'a>(obj: &RefObject, environment: &mut Environment<'a>) -> Box<dyn futures::Future<Output=ResultRefObject>> {
-//     let result = eval(obj, environment);
-//     Box::new(result)
-// }
 
 fn eval_list<'a>(obj: &RefObject, environment: &mut Environment) -> ResultRefObject {
     if not_nil(&obj) {

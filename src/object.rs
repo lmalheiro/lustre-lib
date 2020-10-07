@@ -27,6 +27,10 @@ pub enum Object {
     Symbol(String),
 }
 
+unsafe impl Send for Object {
+
+}
+
 impl PartialEq for Object {
     fn eq(&self, other: &Object) -> bool {
         use Object::*;
