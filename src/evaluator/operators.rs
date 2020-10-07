@@ -1,7 +1,9 @@
 use crate::object::*;
+use crate::environment::Environment;
+
 use std::sync::Arc;
 
-pub fn sum(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
+pub fn sum(obj: RefObject) -> ResultRefObject {
     if not_nil(&obj) {
         let mut total = 0i32;
         let mut next = &obj;
@@ -16,7 +18,7 @@ pub fn sum(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
     }
 }
 
-pub fn mult(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
+pub fn mult(obj: RefObject) -> ResultRefObject {
     if not_nil(&obj) {
         let mut total = 1i32;
         let mut next = &obj;
@@ -31,7 +33,7 @@ pub fn mult(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
     }
 }
 
-pub fn div(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
+pub fn div(obj: RefObject) -> ResultRefObject {
     if not_nil(&obj) {
         let (car, cdr) = destructure_list(&obj)?;
         let mut total = integer_value(&car)?;
@@ -47,7 +49,7 @@ pub fn div(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
     }
 }
 
-pub fn sub(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
+pub fn sub(obj: RefObject) -> ResultRefObject {
     if not_nil(&obj) {
         let (car, cdr) = destructure_list(&obj)?;
         let mut total = integer_value(&car)?;
@@ -63,7 +65,7 @@ pub fn sub(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
     }
 }
 
-pub fn and(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
+pub fn and(obj: RefObject) -> ResultRefObject {
     let (car1, cdr) = destructure_list(&obj)?;
     let (car2, _) = destructure_list(&cdr)?;
     if not_nil(&car1) && not_nil(&car2) {
@@ -73,7 +75,7 @@ pub fn and(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
     }
 }
 
-pub fn or(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
+pub fn or(obj: RefObject) -> ResultRefObject {
     let (car1, cdr) = destructure_list(&obj)?;
     let (car2, _) = destructure_list(&cdr)?;
     if not_nil(&car1) || not_nil(&car2) {
@@ -83,7 +85,7 @@ pub fn or(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
     }
 }
 
-pub fn not(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
+pub fn not(obj: RefObject) -> ResultRefObject {
     let (car1, _) = destructure_list(&obj)?;
     if !not_nil(&car1) {
         Object::Integer(1).into()
@@ -92,7 +94,7 @@ pub fn not(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
     }
 }
 
-pub fn car(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
+pub fn car(obj: RefObject) -> ResultRefObject {
     if not_nil(&obj) {
         let (car, _) = destructure_list(&obj)?;
         let (car, _) = destructure_list(car)?;
@@ -102,7 +104,7 @@ pub fn car(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
     }
 }
 
-pub fn cdr(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
+pub fn cdr(obj: RefObject) -> ResultRefObject {
     if not_nil(&obj) {
         let (car, _) = destructure_list(&obj)?;
         let (_, cdr) = destructure_list(car)?;
@@ -112,7 +114,7 @@ pub fn cdr(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
     }
 }
 
-pub fn greater_than(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
+pub fn greater_than(obj: RefObject) -> ResultRefObject {
     let (car1, cdr) = destructure_list(&obj)?;
     let (car2, _) = destructure_list(&cdr)?;
     if integer_value(&car1)? > integer_value(&car2)? {
@@ -122,7 +124,7 @@ pub fn greater_than(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
     }
 }
 
-pub fn less_than(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
+pub fn less_than(obj: RefObject) -> ResultRefObject {
     let (car1, cdr) = destructure_list(&obj)?;
     let (car2, _) = destructure_list(&cdr)?;
     if integer_value(&car1)? < integer_value(&car2)? {
@@ -132,7 +134,7 @@ pub fn less_than(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
     }
 }
 
-pub fn equal_to(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
+pub fn equal_to(obj: RefObject) -> ResultRefObject {
     let (car1, cdr) = destructure_list(&obj)?;
     let (car2, _) = destructure_list(&cdr)?;
     if integer_value(&car1)? == integer_value(&car2)? {
@@ -142,12 +144,12 @@ pub fn equal_to(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
     }
 }
 
-pub fn quote(obj: RefObject, _env: &dyn Environment) -> ResultRefObject {
+pub fn quote(obj: RefObject) -> ResultRefObject {
     let (car, _) = destructure_list(&obj)?;
     Ok(Arc::clone(car))
 }
 
-pub fn initialize_operators(environment: &mut dyn Environment) {
+pub fn initialize_operators(environment: &mut Environment) {
     macro_rules! register {
         ($name:literal, $func:ident) => {
             environment.intern(

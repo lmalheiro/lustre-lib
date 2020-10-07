@@ -1,103 +1,103 @@
 pub mod operators;
 
+//use futures::future::ok;
 use std::sync::Arc;
 
+use crate::environment::Environment;
 use crate::object::*;
 
-pub struct Evaluator<'a> {
-    environment: &'a mut dyn Environment,
-}
-
-impl<'a> Evaluator<'a> {
-    pub fn new(environment: &'a mut dyn Environment) -> Self {
-        Evaluator { environment }
-    }
-
-    pub fn eval(&mut self, obj: &RefObject) -> ResultRefObject {
-        match obj.as_ref() {
-            None => result_nil(),
-            Some(Object::Cons(car, cdr)) => {
-                if let Some(Object::Symbol(s)) = car.as_ref() {
-                    if s == "IF" {
-                        let (car1, cdr) = destructure_list(cdr)?;
-                        let (car2, cdr) = destructure_list(&cdr)?;
-                        let (car3, _) = destructure_list(&cdr)?;
-                        let test = self.eval(car1)?;
-                        if not_nil(&test) {
-                            self.eval(car2)
-                        } else {
-                            self.eval(car3)
-                        }
-                    } else if s == "QUOTE" {
-                        let (car, _) = destructure_list(cdr)?;
-                        Ok(Arc::clone(car))
-                    } else if s == "LAMBDA" {
-                        self.lambda(cdr)
-                    } else if s == "DEF" {
-                        let (name, cdr) = destructure_list(cdr)?;
-                        let (lambda, _) = destructure_list(cdr)?;
-                        let name = self.eval(name)?;
-                        let lambda = self.eval(lambda)?;
-                        Ok(self.environment.intern(symbol_value(&name)?, lambda))
+pub fn eval(obj: &RefObject, environment: &mut Environment) -> ResultRefObject {
+    match obj.as_ref() {
+        None => result_nil(),
+        Some(Object::Cons(car, cdr)) => {
+            if let Some(Object::Symbol(s)) = car.as_ref() {
+                if s == "IF" {
+                    let (car1, cdr) = destructure_list(cdr)?;
+                    let (car2, cdr) = destructure_list(&cdr)?;
+                    let (car3, _) = destructure_list(&cdr)?;
+                    let test = eval(car1, environment)?;
+                    if not_nil(&test) {
+                        eval(car2, environment)
                     } else {
-                        let car_eval = self.eval(car)?;
-                        let cdr_eval = self.eval_list(cdr)?;
-                        self.apply(car_eval, cdr_eval)
+                        eval(car3, environment)
+                    }
+                } else if s == "QUOTE" {
+                    let (car, _) = destructure_list(cdr)?;
+                    Ok(Arc::clone(car))
+                } else if s == "LAMBDA" {
+                    lambda(cdr)
+                } else if s == "DEF" {
+                    let (name, cdr) = destructure_list(cdr)?;
+                    let (value, _) = destructure_list(cdr)?;
+                    let name = eval(name, environment)?;
+                    if let None = environment.find_symbol(&symbol_value(&name)?) {
+                        let value = eval(value, environment)?;
+                        Ok(environment.intern(symbol_value(&name)?, value))
+                    } else {
+                        panic!("Not allowed to redefine symbol.")
                     }
                 } else {
-                    let car_eval = self.eval(car)?;
-                    let cdr_eval = self.eval_list(cdr)?;
-                    self.apply(car_eval, cdr_eval)
+                    let car_eval = eval(car, environment)?;
+                    let cdr_eval = eval_list(cdr, environment)?;
+                    apply(car_eval, cdr_eval, environment)
                 }
+            } else {
+                let car_eval = eval(car, environment)?;
+                let cdr_eval = eval_list(cdr, environment)?;
+                apply(car_eval, cdr_eval, environment)
             }
-            Some(Object::Symbol(s)) => match self.environment.find_symbol(s) {
-                Some(v) => Ok(Arc::clone(&v)),
-                _ => panic!("Unbound!"),
-            },
-            _ => Ok(Arc::clone(obj)),
         }
+        Some(Object::Symbol(s)) => match environment.find_symbol(s) {
+            Some(v) => Ok(Arc::clone(&v)),
+            _ => panic!("Unbound!"),
+        },
+        _ => Ok(Arc::clone(obj)),
     }
+}
 
-    fn eval_list(&mut self, obj: &RefObject) -> ResultRefObject {
-        if not_nil(&obj) {
-            let (car, cdr) = destructure_list(obj)?;
-            Object::Cons(self.eval(car)?, self.eval_list(cdr)?).into()
-        } else {
-            result_nil()
-        }
+// async fn async_eval<'a>(obj: &RefObject, environment: &mut Environment<'a>) -> Box<dyn futures::Future<Output=ResultRefObject>> {
+//     let result = eval(obj, environment);
+//     Box::new(result)
+// }
+
+fn eval_list<'a>(obj: &RefObject, environment: &mut Environment) -> ResultRefObject {
+    if not_nil(&obj) {
+        let (car, cdr) = destructure_list(obj)?;
+        Object::Cons(eval(car, environment)?, eval_list(cdr, environment)?).into()
+    } else {
+        result_nil()
     }
+}
 
-    fn lambda(&self, obj: &RefObject) -> ResultRefObject {
-        let (params, cdr) = destructure_list(obj)?;
-        let (expression, _) = destructure_list(cdr)?;
-        Object::Lambda(params.clone(), expression.clone()).into()
-    }
+fn lambda(obj: &RefObject) -> ResultRefObject {
+    let (params, cdr) = destructure_list(obj)?;
+    let (expression, _) = destructure_list(cdr)?;
+    Object::Lambda(params.clone(), expression.clone()).into()
+}
 
-    fn apply(&mut self, function: RefObject, cdr: RefObject) -> ResultRefObject {
-        match function
-            .as_ref()
-            .as_ref()
-            .expect("Expecting a value, instead got nil or other None value.")
-        {
-            Object::Lambda(parameters, expression) => {
-                self.environment.new_layer();
-                let values = self.eval_list(&cdr)?;
-                let mut next_value = &values;
-                let mut next_param = parameters;
-                while not_nil(next_value) && not_nil(next_param) {
-                    let (value, cdr_value) = destructure_list(next_value)?;
-                    let (param, cdr_param) = destructure_list(next_param)?;
-                    self.environment.intern(symbol_value(param)?, value.clone());
-                    next_value = cdr_value;
-                    next_param = cdr_param;
-                }
-                let result = self.eval(expression);
-                self.environment.drop_layer();
-                Ok(result?)
+fn apply(function: RefObject, cdr: RefObject, environment: &mut Environment) -> ResultRefObject {
+    match function
+        .as_ref()
+        .as_ref()
+        .expect("Expecting a value, instead got nil or other None value.")
+    {
+        Object::Lambda(parameters, expression) => {
+            let values = eval_list(&cdr, environment)?;
+            let mut next_value = &values;
+            let mut next_param = parameters;
+            let mut scope = Environment::from(environment);
+            while not_nil(next_value) && not_nil(next_param) {
+                let (value, cdr_value) = destructure_list(next_value)?;
+                let (param, cdr_param) = destructure_list(next_param)?;
+                scope.intern(symbol_value(param)?, value.clone());
+                next_value = cdr_value;
+                next_param = cdr_param;
             }
-            Object::Operator(_, f) => f(cdr, self.environment),
-            _ => panic!("Expected operator or function."),
+            let result = eval(expression, &mut scope);
+            Ok(result?)
         }
+        Object::Operator(_, f) => f(cdr),
+        _ => panic!("Expected operator or function."),
     }
 }
 
@@ -118,8 +118,7 @@ mod tests {
             let value = reader::Reader::new(tokenizer).read().unwrap();
             eprintln!("reader: {:?}", value);
             if let Some(_) = value.as_ref() {
-                let mut evaluator = Evaluator::new(&mut environment);
-                let result = evaluator.eval(&value);
+                let result = eval(&value, &mut environment);
                 eprintln!("result: {:?}", result);
                 if let Some($var) = result.unwrap().as_ref() {
                     eprintln!("result: {}", $var);
@@ -223,22 +222,21 @@ mod tests {
         let mut environment = environment::Environment::new();
         operators::initialize_operators(&mut environment);
         let mut reader = reader::Reader::new(tokenizer);
-        let mut evaluator = Evaluator::new(&mut environment);
-
         let mut result: ResultRefObject = result_nil();
         loop {
             let ast = reader.read().unwrap();
             eprintln!("reader: {:?}", ast);
             if ast.as_ref().is_some() {
-                result = evaluator.eval(&ast);
+                result = eval(&ast, &mut environment);
             } else {
                 break;
             }
         }
-        
-        assert_eq!(Object::Integer(34), *result.unwrap().as_ref().as_ref().unwrap());
 
-        
+        assert_eq!(
+            Object::Integer(34),
+            *result.unwrap().as_ref().as_ref().unwrap()
+        );
     }
 
     #[test]
@@ -255,21 +253,20 @@ mod tests {
         let mut environment = environment::Environment::new();
         operators::initialize_operators(&mut environment);
         let mut reader = reader::Reader::new(tokenizer);
-        let mut evaluator = Evaluator::new(&mut environment);
-
         let mut result: ResultRefObject = result_nil();
         loop {
             let ast = reader.read().unwrap();
             eprintln!("reader: {:?}", ast);
             if ast.as_ref().is_some() {
-                result = evaluator.eval(&ast);
+                result = eval(&ast, &mut environment);
             } else {
                 break;
             }
         }
         eprintln!("result: {:?}", result);
-        assert_eq!(Object::Integer(5040), *result.unwrap().as_ref().as_ref().unwrap());
-
-        
+        assert_eq!(
+            Object::Integer(5040),
+            *result.unwrap().as_ref().as_ref().unwrap()
+        );
     }
 }

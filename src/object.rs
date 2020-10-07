@@ -16,15 +16,7 @@ pub fn result_nil() -> ResultRefObject {
     Ok(Arc::new(None))
 }
 
-pub trait Environment {
-    fn find_symbol(&self, symbol: &String) -> Option<RefObject>;
-    fn new_layer(&mut self);
-    fn drop_layer(&mut self);
-    fn intern(&mut self, symbol: String, value: RefObject) -> RefObject;
-    fn unintern(&mut self, symbol: &String);
-}
-
-type Op = fn(RefObject, &dyn Environment) -> ResultRefObject;
+type Op = fn(RefObject) -> ResultRefObject;
 
 pub enum Object {
     Integer(i32),

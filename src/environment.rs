@@ -1,58 +1,48 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::object;
-use crate::object::{RefObject, nil};
+use crate::object::{nil, RefObject};
 
-pub struct Environment {
-    layers: Vec<HashMap<String, RefObject>>,
+pub struct Environment<'a> {
+    previous: Option<&'a Environment<'a>>,
+    symbols: HashMap<String, RefObject>,
 }
 
-impl Environment {
+impl<'a> Environment<'a> {
     pub fn new() -> Self {
         let mut value = Self {
-            layers: vec![HashMap::new()]
+            previous: None,
+            symbols: HashMap::new(),
         };
-        use crate::object::Environment;
         value.intern("nil".to_string(), nil());
         value
     }
 }
 
-impl object::Environment for Environment {
-    
-    fn find_symbol(&self, symbol: &String) -> Option<RefObject> {
-        //eprintln!("FIND: {:?}", self.layers.last());
-
-        let mut i = self.layers.iter().rev();
-
-        loop {
-            if let Some(layer) = i.next() {
-                if let Some(value) = layer.get(&symbol.to_uppercase()) {
-                    break Some(Arc::clone(value));
-                }
+impl<'a> Environment<'a> {
+    pub fn find_symbol(&self, symbol: &String) -> Option<RefObject> {
+        if let Some(value) = self.symbols.get(&symbol.to_uppercase()) {
+            Some(Arc::clone(value))
+        } else {
+            if let Some(previous) = self.previous {
+                previous.find_symbol(symbol)
             } else {
-                break None;
-            };
+                None
+            }
         }
     }
-    fn new_layer(&mut self) {
-        self.layers
-            .push(HashMap::<String, RefObject>::new());
+    pub fn from(previous: &'a Self) -> Environment<'a> {
+        Self {
+            previous: Some(previous),
+            symbols: HashMap::new(),
+        }
     }
-    fn drop_layer(&mut self) {
-        assert!(self.layers.len() > 1); // Should not drop the last one
-        self.layers.pop();
-    }
-    fn intern(&mut self, symbol: String, value: RefObject) -> RefObject {
-        self.layers
-            .last_mut()
-            .unwrap()
+    pub fn intern(&mut self, symbol: String, value: RefObject) -> RefObject {
+        self.symbols
             .insert(symbol.to_uppercase(), Arc::clone(&value));
-        //eprintln!("INTERN: {:?}", self.layers.last());
         value
     }
-    fn unintern(&mut self, symbol: &String) {
-        self.layers.last_mut().unwrap().remove(symbol);
+    pub fn unintern(&mut self, symbol: &String) {
+        self.symbols.remove(symbol);
     }
 }
