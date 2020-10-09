@@ -1,5 +1,6 @@
+use crate::evaluator::RefEnvironment;
 use crate::object::*;
-use crate::environment::Environment;
+
 
 use std::sync::Arc;
 
@@ -149,10 +150,10 @@ pub fn quote(obj: RefObject) -> ResultRefObject {
     Ok(Arc::clone(car))
 }
 
-pub fn initialize_operators(environment: &mut Environment) {
+pub fn initialize_operators(environment: &RefEnvironment) {
     macro_rules! register {
         ($name:literal, $func:ident) => {
-            environment.intern(
+            environment.0.write().unwrap().intern(
                 String::from($name),
                 Arc::new(Some(Object::Operator(String::from($name), $func))),
             );

@@ -1,12 +1,13 @@
 pub mod operators;
 
+use crate::environment::RefEnvironment;
 use std::sync::Arc;
 
 use crate::environment::Environment;
 use crate::object::*;
-use crate::eval_workers::*;
+//use crate::eval_workers::*;
 
-pub fn eval(obj: &RefObject, environment: &mut Environment) -> ResultRefObject {
+pub fn eval(obj: &RefObject, environment: &RefEnvironment ) -> ResultRefObject {
     match obj.as_ref() {
         None => result_nil(),
         Some(Object::Cons(car, cdr)) => {
@@ -30,9 +31,11 @@ pub fn eval(obj: &RefObject, environment: &mut Environment) -> ResultRefObject {
                     let (name, cdr) = destructure_list(cdr)?;
                     let (value, _) = destructure_list(cdr)?;
                     let name = eval(name, environment)?;
-                    if let None = environment.find_symbol(&symbol_value(&name)?) {
+                    let env = environment.0.read().unwrap();
+                    if let None = env.find_symbol(&symbol_value(&name)?) {
+                        drop(env);
                         let value = eval(value, environment)?;
-                        Ok(environment.intern(symbol_value(&name)?, value))
+                        Ok(environment.0.write().unwrap().intern(symbol_value(&name)?, value))
                     } else {
                         panic!("Not allowed to redefine symbol.")
                     }
@@ -47,7 +50,7 @@ pub fn eval(obj: &RefObject, environment: &mut Environment) -> ResultRefObject {
                 apply(car_eval, cdr_eval, environment)
             }
         }
-        Some(Object::Symbol(s)) => match environment.find_symbol(s) {
+        Some(Object::Symbol(s)) => match environment.0.read().unwrap().find_symbol(s) {
             Some(v) => Ok(Arc::clone(&v)),
             _ => panic!("Unbound!"),
         },
@@ -55,7 +58,7 @@ pub fn eval(obj: &RefObject, environment: &mut Environment) -> ResultRefObject {
     }
 }
 
-fn eval_list<'a>(obj: &RefObject, environment: &mut Environment) -> ResultRefObject {
+fn eval_list<'a>(obj: &RefObject, environment: &RefEnvironment) -> ResultRefObject {
     if not_nil(&obj) {
         let (car, cdr) = destructure_list(obj)?;
         Object::Cons(eval(car, environment)?, eval_list(cdr, environment)?).into()
@@ -70,7 +73,7 @@ fn lambda(obj: &RefObject) -> ResultRefObject {
     Object::Lambda(params.clone(), expression.clone()).into()
 }
 
-fn apply(function: RefObject, cdr: RefObject, environment: &mut Environment) -> ResultRefObject {
+fn apply(function: RefObject, cdr: RefObject, environment: &RefEnvironment) -> ResultRefObject {
     match function
         .as_ref()
         .as_ref()
@@ -80,11 +83,11 @@ fn apply(function: RefObject, cdr: RefObject, environment: &mut Environment) -> 
             let values = eval_list(&cdr, environment)?;
             let mut next_value = &values;
             let mut next_param = parameters;
-            let mut scope = Environment::from(environment);
+            let mut scope = RefEnvironment::from(environment);
             while not_nil(next_value) && not_nil(next_param) {
                 let (value, cdr_value) = destructure_list(next_value)?;
                 let (param, cdr_param) = destructure_list(next_param)?;
-                scope.intern(symbol_value(param)?, value.clone());
+                scope.0.write().unwrap().intern(symbol_value(param)?, value.clone());
                 next_value = cdr_value;
                 next_param = cdr_param;
             }
@@ -108,7 +111,7 @@ mod tests {
         ($code:expr; with $var:ident $test:block) => {
             let input = $code;
             let tokenizer = reader::tokenizer::Tokenizer::new(Cursor::new(input).bytes());
-            let mut environment = environment::Environment::new();
+            let mut environment = RefEnvironment::new();
             operators::initialize_operators(&mut environment);
             let value = reader::Reader::new(tokenizer).read().unwrap();
             eprintln!("reader: {:?}", value);
@@ -214,7 +217,7 @@ mod tests {
     fn eval_test_7() {
         let input = "(def 'add (lambda (x y) (+ x y))) (add 13 21)";
         let tokenizer = reader::tokenizer::Tokenizer::new(Cursor::new(input).bytes());
-        let mut environment = environment::Environment::new();
+        let mut environment = RefEnvironment::new();
         operators::initialize_operators(&mut environment);
         let mut reader = reader::Reader::new(tokenizer);
         let mut result: ResultRefObject = result_nil();
@@ -222,7 +225,7 @@ mod tests {
             let ast = reader.read().unwrap();
             eprintln!("reader: {:?}", ast);
             if ast.as_ref().is_some() {
-                result = eval(&ast, &mut environment);
+                result = eval(&ast, &environment);
             } else {
                 break;
             }
@@ -245,15 +248,15 @@ mod tests {
                          ))) 
         (fact 7)";
         let tokenizer = reader::tokenizer::Tokenizer::new(Cursor::new(input).bytes());
-        let mut environment = environment::Environment::new();
-        operators::initialize_operators(&mut environment);
+        let environment = environment::RefEnvironment::new();
+        operators::initialize_operators(&environment);
         let mut reader = reader::Reader::new(tokenizer);
         let mut result: ResultRefObject = result_nil();
         loop {
             let ast = reader.read().unwrap();
             eprintln!("reader: {:?}", ast);
             if ast.as_ref().is_some() {
-                result = eval(&ast, &mut environment);
+                result = eval(&ast, &environment);
             } else {
                 break;
             }

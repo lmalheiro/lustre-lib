@@ -12,14 +12,14 @@
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=lustre",
-                    "--package=lustre",
+                    "--lib=liblustre_lib",
+                    "--package=lustre_lib",
                     "--",
                     "--nocapture"
                 ],
                 "filter": {
-                    "name": "lustre",
-                    "kind": "bin"
+                    "name": "lustre_lib",
+                    "kind": "lib"
                 }
             },
             "args": [],
@@ -33,12 +33,12 @@
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=lustre",
-                    "--package=lustre"
+                    "--lib=liblustre_lib",
+                    "--package=lustre_lib"
                 ],
                 "filter": {
-                    "name": "lustre",
-                    "kind": "bin"
+                    "name": "lustre_lib",
+                    "kind": "lib"
                 }
             },
             "args": [],

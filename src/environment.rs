@@ -1,56 +1,64 @@
-use std::sync::Mutex;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use crate::object::{nil, RefObject};
 
-pub struct Environment<'a> {
-    previous: Option<&'a Environment<'a>>,
-    symbols: Mutex<HashMap<String, RefObject>>,
+type Symbols = RwLock<HashMap<String, RefObject>>;
+
+#[derive(Clone)]
+pub struct RefEnvironment(pub Arc<RwLock<Environment>>);
+
+pub struct Environment {
+    previous: Option<RefEnvironment>,
+    symbols: Symbols,
 }
 
-impl<'a> Environment<'a> {
-    pub fn new() -> Self {
+impl Environment {
+    fn new() -> Self {
         let mut value = Self {
             previous: None,
-            symbols: Mutex::new(HashMap::new()),
+            symbols: RwLock::new(HashMap::new()),
         };
         value.intern("nil".to_string(), nil());
         value
     }
 }
 
-impl<'a> Environment<'a> {
+impl RefEnvironment {
+    pub fn new() -> Self {
+        Self(Arc::new(RwLock::new(Environment::new())))
+    }
+    pub fn from(previous: &RefEnvironment) -> RefEnvironment {
+
+        Self (Arc::new(RwLock::new(Environment {
+            previous: Some(previous.clone()),
+            symbols: RwLock::new(HashMap::new()),
+        })))
+    }
+}
+
+impl Environment {
     pub fn find_symbol(&self, symbol: &String) -> Option<RefObject> {
-        let symbols = self.symbols.lock().unwrap();
-        if let Some(value) = symbols.get(&symbol.to_uppercase()) {
+        if let Some(value) = self.symbols.read().unwrap().get(&symbol.to_uppercase()) {
             Some(Arc::clone(value))
         } else {
-            drop(symbols);
-            if let Some(previous) = self.previous {
-                previous.find_symbol(symbol)
+            if let Some(previous) = &self.previous {
+                previous.0.read().unwrap().find_symbol(symbol)
             } else {
                 None
             }
         }
     }
-    pub fn from(previous: &'a Self) -> Environment<'a> {
-        Self {
-            previous: Some(previous),
-            symbols: Mutex::new(HashMap::new()),
-        }
-    }
+    
     pub fn intern(&mut self, symbol: String, value: RefObject) -> RefObject {
-        let mut symbols = self.symbols.lock().unwrap();
-        symbols
-            .insert(symbol.to_uppercase(), Arc::clone(&value));
+        let mut symbols = self.symbols.write().unwrap();
+        symbols.insert(symbol.to_uppercase(), Arc::clone(&value));
         value
     }
     pub fn unintern(&mut self, symbol: &String) {
-        let mut symbols = self.symbols.lock().unwrap();
+        let mut symbols = self.symbols.write().unwrap();
         symbols.remove(symbol);
     }
 }
 
-unsafe impl<'a> Sync for Environment<'a> {}
-
+//unsafe impl<'a> Sync for Environment {}
