@@ -1,5 +1,6 @@
 pub mod operators;
 
+
 use std::sync::Arc;
 
 use crate::object::*;
@@ -58,13 +59,30 @@ impl<'a> Evaluator<'a> {
         }
     }
 
-    fn eval_list(&mut self, obj: &RefObject) -> ResultRefObject {
-        if not_nil(&obj) {
+    fn _eval_list(&mut self, obj: &RefObject) -> ResultRefObject {
+        if not_nil(obj) {
             let (car, cdr) = destructure_list(obj)?;
             Object::Cons(self.eval(car)?, self.eval_list(cdr)?).into()
         } else {
             result_nil()
         }
+    }
+
+    fn eval_list(&mut self, obj: &RefObject) -> ResultRefObject {
+        let mut next = obj;
+        let mut result:RefObject = nil();
+        let mut partials: Vec<_> = Vec::new();
+        while not_nil(next) {
+            let (car, cdr) = destructure_list(next)?;
+            partials.push(self.eval(car)?);
+            next = cdr;
+        }
+        
+        while let Some(value) = partials.pop() {
+            result = Arc::new(Some(Object::Cons(value, result)));
+        }
+        
+        Ok(result)
     }
 
     fn lambda(&self, obj: &RefObject) -> ResultRefObject {

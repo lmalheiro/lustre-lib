@@ -17,3 +17,5 @@ rustf8 = { path = "../rustf8" }
 anyhow = "1.0.32"
 thiserror = "1.0.20"
 lazy_static = "1.4.0"
+futures = "0.3.6"
+tokio = { version= "0.2.22", features = [ "rt-threaded" ] }
