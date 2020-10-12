@@ -12,6 +12,7 @@ pub struct Environment {
     previous: Option<RefEnvironment>,
     symbols: Symbols,
 }
+//unsafe impl Send for Environment{}
 
 impl Environment {
     fn new() -> Self {

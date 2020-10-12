@@ -2,12 +2,18 @@ pub mod operators;
 
 use crate::environment::RefEnvironment;
 use std::sync::Arc;
+use crate::object::{destructure_list, nil, not_nil, result_nil, symbol_value, Object, RefObject, ResultRefObject};
+use tokio::runtime::Runtime;
+use async_recursion::async_recursion;
 
-use crate::environment::Environment;
-use crate::object::*;
-//use crate::eval_workers::*;
+pub fn eval(obj: &RefObject, environment: &RefEnvironment, rt: &mut Runtime) -> ResultRefObject {
+    rt.block_on(async move {
+        parallel_eval(obj, environment).await
+    })
+}
 
-pub fn eval(obj: &RefObject, environment: &RefEnvironment ) -> ResultRefObject {
+#[async_recursion]
+async fn parallel_eval(obj: &RefObject, environment: &RefEnvironment ) -> ResultRefObject {
     match obj.as_ref() {
         None => result_nil(),
         Some(Object::Cons(car, cdr)) => {
@@ -16,11 +22,13 @@ pub fn eval(obj: &RefObject, environment: &RefEnvironment ) -> ResultRefObject {
                     let (car1, cdr) = destructure_list(cdr)?;
                     let (car2, cdr) = destructure_list(&cdr)?;
                     let (car3, _) = destructure_list(&cdr)?;
-                    let test = eval(car1, environment)?;
-                    if not_nil(&test) {
-                        eval(car2, environment)
+                    let test = parallel_eval(car1, environment);
+                    let true_statement = parallel_eval(car2, environment);
+                    let false_statement = parallel_eval(car3, environment);
+                    if not_nil(&test.await?) {
+                        true_statement.await
                     } else {
-                        eval(car3, environment)
+                        false_statement.await
                     }
                 } else if s == "QUOTE" {
                     let (car, _) = destructure_list(cdr)?;
@@ -30,24 +38,26 @@ pub fn eval(obj: &RefObject, environment: &RefEnvironment ) -> ResultRefObject {
                 } else if s == "DEF" {
                     let (name, cdr) = destructure_list(cdr)?;
                     let (value, _) = destructure_list(cdr)?;
-                    let name = eval(name, environment)?;
-                    let env = environment.0.read().unwrap();
-                    if let None = env.find_symbol(&symbol_value(&name)?) {
-                        drop(env);
-                        let value = eval(value, environment)?;
+                    let name = parallel_eval(name, environment).await?;
+                    let search_result = {
+                        let env = environment.0.read().unwrap();
+                        env.find_symbol(&symbol_value(&name)?)
+                    };
+                    if let None = search_result {
+                        let value = parallel_eval(value, environment).await?;
                         Ok(environment.0.write().unwrap().intern(symbol_value(&name)?, value))
                     } else {
                         panic!("Not allowed to redefine symbol.")
                     }
                 } else {
-                    let car_eval = eval(car, environment)?;
-                    let cdr_eval = eval_list(cdr, environment)?;
-                    apply(car_eval, cdr_eval, environment)
+                    let car_eval = parallel_eval(car, environment);
+                    let cdr_eval = parallel_eval_list(cdr, environment);
+                    apply(car_eval.await?, cdr_eval.await?, environment).await
                 }
             } else {
-                let car_eval = eval(car, environment)?;
-                let cdr_eval = eval_list(cdr, environment)?;
-                apply(car_eval, cdr_eval, environment)
+                let car_eval = parallel_eval(car, environment);
+                let cdr_eval = parallel_eval_list(cdr, environment);
+                apply(car_eval.await?, cdr_eval.await?, environment).await
             }
         }
         Some(Object::Symbol(s)) => match environment.0.read().unwrap().find_symbol(s) {
@@ -58,13 +68,48 @@ pub fn eval(obj: &RefObject, environment: &RefEnvironment ) -> ResultRefObject {
     }
 }
 
-fn eval_list<'a>(obj: &RefObject, environment: &RefEnvironment) -> ResultRefObject {
-    if not_nil(&obj) {
-        let (car, cdr) = destructure_list(obj)?;
-        Object::Cons(eval(car, environment)?, eval_list(cdr, environment)?).into()
-    } else {
-        result_nil()
+// fn _recursive_eval_list<'a>(obj: &RefObject, environment: &RefEnvironment) -> ResultRefObject {
+//     if not_nil(&obj) {
+//         let (car, cdr) = destructure_list(obj)?;
+//         Object::Cons(eval(car, environment)?, eval_list(cdr, environment)?).into()
+//     } else {
+//         result_nil()
+//     }
+// }
+
+// fn eval_list(obj: &RefObject, environment: &RefEnvironment) -> ResultRefObject {
+//     let mut next = obj;
+//     let mut result:RefObject = nil();
+//     let mut partials: Vec<_> = Vec::new();
+//     while not_nil(next) {
+//         let (car, cdr) = destructure_list(next)?;
+//         partials.push(eval(car, environment)?);
+//         next = cdr;
+//     }
+    
+//     while let Some(value) = partials.pop() {
+//         result = Arc::new(Some(Object::Cons(value, result)));
+//     }
+    
+//     Ok(result)
+// }
+
+#[async_recursion]
+async fn parallel_eval_list(obj: &RefObject, environment: &RefEnvironment) -> ResultRefObject {
+    let mut next = obj;
+    let mut result:RefObject = nil();
+    let mut partials: Vec<_> = Vec::new();
+    while not_nil(next) {
+        let (car, cdr) = destructure_list(next)?;
+        partials.push(parallel_eval(car, environment));
+        next = cdr;
     }
+
+    while let Some(value) = partials.pop() {
+        result = Arc::new(Some(Object::Cons(value.await?, result)));
+    }
+    
+    Ok(result)
 }
 
 fn lambda(obj: &RefObject) -> ResultRefObject {
@@ -73,14 +118,15 @@ fn lambda(obj: &RefObject) -> ResultRefObject {
     Object::Lambda(params.clone(), expression.clone()).into()
 }
 
-fn apply(function: RefObject, cdr: RefObject, environment: &RefEnvironment) -> ResultRefObject {
+#[async_recursion]
+async fn apply(function: RefObject, cdr: RefObject, environment: &RefEnvironment) -> ResultRefObject {
     match function
         .as_ref()
         .as_ref()
         .expect("Expecting a value, instead got nil or other None value.")
     {
         Object::Lambda(parameters, expression) => {
-            let values = eval_list(&cdr, environment)?;
+            let values = parallel_eval_list(&cdr, environment).await?;
             let mut next_value = &values;
             let mut next_param = parameters;
             let mut scope = RefEnvironment::from(environment);
@@ -91,7 +137,7 @@ fn apply(function: RefObject, cdr: RefObject, environment: &RefEnvironment) -> R
                 next_value = cdr_value;
                 next_param = cdr_param;
             }
-            let result = eval(expression, &mut scope);
+            let result = parallel_eval(expression, &mut scope).await;
             Ok(result?)
         }
         Object::Operator(_, f) => f(cdr),
@@ -109,6 +155,7 @@ mod tests {
 
     macro_rules! test_eval {
         ($code:expr; with $var:ident $test:block) => {
+            let mut rt = Runtime::new().unwrap();
             let input = $code;
             let tokenizer = reader::tokenizer::Tokenizer::new(Cursor::new(input).bytes());
             let mut environment = RefEnvironment::new();
@@ -116,7 +163,7 @@ mod tests {
             let value = reader::Reader::new(tokenizer).read().unwrap();
             eprintln!("reader: {:?}", value);
             if let Some(_) = value.as_ref() {
-                let result = eval(&value, &mut environment);
+                let result = eval(&value, &mut environment, &mut rt);
                 eprintln!("result: {:?}", result);
                 if let Some($var) = result.unwrap().as_ref() {
                     eprintln!("result: {}", $var);
@@ -216,6 +263,7 @@ mod tests {
     #[test]
     fn eval_test_7() {
         let input = "(def 'add (lambda (x y) (+ x y))) (add 13 21)";
+        let mut rt = Runtime::new().unwrap();
         let tokenizer = reader::tokenizer::Tokenizer::new(Cursor::new(input).bytes());
         let mut environment = RefEnvironment::new();
         operators::initialize_operators(&mut environment);
@@ -225,7 +273,7 @@ mod tests {
             let ast = reader.read().unwrap();
             eprintln!("reader: {:?}", ast);
             if ast.as_ref().is_some() {
-                result = eval(&ast, &environment);
+                result = eval(&ast, &environment, &mut rt);
             } else {
                 break;
             }
@@ -239,6 +287,7 @@ mod tests {
 
     #[test]
     fn eval_test_8() {
+        let mut rt = Runtime::new().unwrap();
         let input = "
         (def 'fact (lambda (n) 
                      (if (< n 1) 
@@ -256,7 +305,7 @@ mod tests {
             let ast = reader.read().unwrap();
             eprintln!("reader: {:?}", ast);
             if ast.as_ref().is_some() {
-                result = eval(&ast, &environment);
+                result = eval(&ast, &environment, &mut rt);
             } else {
                 break;
             }

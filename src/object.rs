@@ -102,6 +102,12 @@ impl From<Object> for ResultRefObject {
     }
 }
 
+impl From<Object> for Box<ResultRefObject> {
+    fn from(obj: Object) -> Self {
+        Box::new(Ok(Arc::new(Some(obj))))
+    }
+}
+
 impl From<Object> for RefObject {
     fn from(obj: Object) -> Self {
         Arc::new(Some(obj))
