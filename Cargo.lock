@@ -238,7 +238,9 @@ dependencies = [
 
 [[package]]
 name = "rustf8"
-version = "0.1.0"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f953701782f8aee39d95852c8945a46154cfc14e5f76250877606e0387eab02"
 dependencies = [
  "thiserror",
 ]
