@@ -13,7 +13,7 @@ license = "MIT"
 
 
 [dependencies]
-rustf8 = { path = "../rustf8" }
+rustf8 = { git = "https://github.com/lmalheiro/rustf8.git", branch="master" }
 anyhow = "1.0.32"
 thiserror = "1.0.20"
 lazy_static = "1.4.0"

@@ -19,16 +19,13 @@ async fn parallel_eval(obj: &RefObject, environment: RefEnvironment ) -> ResultR
         Some(Object::Cons(car, cdr)) => {
             if let Some(Object::Symbol(s)) = car.as_ref() {
                 if s == "IF" {
-                    let (car1, cdr) = destructure_list(cdr)?;
-                    let (car2, cdr) = destructure_list(&cdr)?;
-                    let (car3, _) = destructure_list(&cdr)?;
-                    let test = parallel_eval(car1, environment.clone());
-                    let true_statement = parallel_eval(car2, environment.clone());
-                    let false_statement = parallel_eval(car3, environment.clone());
-                    if not_nil(&test.await?) {
-                        true_statement.await
+                    let (test, cdr) = destructure_list(cdr)?;
+                    let (true_expr, cdr) = destructure_list(&cdr)?;
+                    let (false_expr, _) = destructure_list(&cdr)?;
+                    if not_nil(&parallel_eval(test, environment.clone()).await?) {
+                        parallel_eval(true_expr, environment.clone()).await
                     } else {
-                        false_statement.await
+                        parallel_eval(false_expr, environment.clone()).await
                     }
                 } else if s == "QUOTE" {
                     let (car, _) = destructure_list(cdr)?;
@@ -67,32 +64,6 @@ async fn parallel_eval(obj: &RefObject, environment: RefEnvironment ) -> ResultR
         _ => Ok(Arc::clone(obj)),
     }
 }
-
-// fn _recursive_eval_list<'a>(obj: &RefObject, environment: &RefEnvironment) -> ResultRefObject {
-//     if not_nil(&obj) {
-//         let (car, cdr) = destructure_list(obj)?;
-//         Object::Cons(eval(car, environment)?, eval_list(cdr, environment)?).into()
-//     } else {
-//         result_nil()
-//     }
-// }
-
-// fn eval_list(obj: &RefObject, environment: &RefEnvironment) -> ResultRefObject {
-//     let mut next = obj;
-//     let mut result:RefObject = nil();
-//     let mut partials: Vec<_> = Vec::new();
-//     while not_nil(next) {
-//         let (car, cdr) = destructure_list(next)?;
-//         partials.push(eval(car, environment)?);
-//         next = cdr;
-//     }
-    
-//     while let Some(value) = partials.pop() {
-//         result = Arc::new(Some(Object::Cons(value, result)));
-//     }
-    
-//     Ok(result)
-// }
 
 #[async_recursion]
 async fn parallel_eval_list(obj: &RefObject, environment: RefEnvironment) -> ResultRefObject {
